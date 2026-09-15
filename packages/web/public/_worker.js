@@ -12,7 +12,7 @@ export default {
 
       // Set this to your Workers deployment URL
       // After first deploy, update this with your actual Workers URL
-      apiUrl.hostname = env.API_HOST || 'icp-api.islamic-community-platform.workers.dev';
+      apiUrl.hostname = env.API_HOST || 'icp-api.framewebpixel.workers.dev';
 
       const proxyRequest = new Request(apiUrl.toString(), {
         method: request.method,
