@@ -1,0 +1,1 @@
+ALTER TYPE "public"."community_role" ADD VALUE 'SUPER_ADMIN' BEFORE 'COMMUNITY_OWNER';

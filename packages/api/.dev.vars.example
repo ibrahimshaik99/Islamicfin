@@ -1,0 +1,5 @@
+# Environment variables for local Cloudflare Workers development
+# Copy this file to .dev.vars and fill in values
+
+DATABASE_URL=postgresql://user:password@host:5432/dbname
+SESSION_SECRET=replace-with-a-secure-random-string
