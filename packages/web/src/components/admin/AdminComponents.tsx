@@ -222,6 +222,7 @@ const statusColors: Record<string, string> = {
   PAST_DUE: 'bg-orange-50 text-orange-700 border border-orange-200',
   NEEDS_REVISION: 'bg-orange-50 text-orange-700 border border-orange-200',
   UNDER_REVIEW: 'bg-orange-50 text-orange-700 border border-orange-200',
+  COMPLETED: 'bg-blue-50 text-blue-700 border border-blue-200',
   CANCELLED: 'bg-slate-100 text-slate-600 border border-slate-200',
   ARCHIVED: 'bg-slate-100 text-slate-600 border border-slate-200',
   TRIALING: 'bg-blue-50 text-blue-700 border border-blue-200',

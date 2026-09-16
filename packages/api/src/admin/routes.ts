@@ -1272,4 +1272,117 @@ adminRoutes.patch('/fraud/flags/:flagId', async (c) => {
   return c.json({ data: updated });
 });
 
+// Admin: list all orders across platform
+adminRoutes.get('/orders', async (c) => {
+  const page = parseInt(c.req.query('page') || '1');
+  const limit = parseInt(c.req.query('limit') || '20');
+  const status = c.req.query('status');
+  const communityId = c.req.query('communityId');
+  const offset = (page - 1) * limit;
+
+  const conditions = [];
+  if (status) conditions.push(eq(orders.orderStatus, status as typeof orders.orderStatus.enumValues[number]));
+  if (communityId) conditions.push(eq(orders.communityId, communityId));
+
+  const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+  const [{ value: total }] = await db
+    .select({ count: count() })
+    .from(orders)
+    .where(whereClause);
+
+  const data = await db
+    .select({
+      id: orders.id,
+      orderNumber: orders.orderNumber,
+      customerId: orders.customerId,
+      merchantId: orders.merchantId,
+      communityId: orders.communityId,
+      total: orders.total,
+      orderStatus: orders.orderStatus,
+      paymentStatus: orders.paymentStatus,
+      paymentMethod: orders.paymentMethod,
+      createdAt: orders.createdAt,
+      customerName: users.name,
+      customerEmail: users.email,
+      communityName: communities.name,
+    })
+    .from(orders)
+    .innerJoin(users, eq(orders.customerId, users.id))
+    .innerJoin(communities, eq(orders.communityId, communities.id))
+    .where(whereClause)
+    .orderBy(desc(orders.createdAt))
+    .limit(limit)
+    .offset(offset);
+
+  return c.json({
+    data,
+    pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+  });
+});
+
+// Admin: enhanced user detail with order history
+adminRoutes.get('/users/:userId', async (c) => {
+  const { userId } = c.req.param();
+
+  const [user] = await db
+    .select()
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+
+  if (!user) {
+    return c.json({ error: { code: 'NOT_FOUND', message: 'User not found' } }, 404);
+  }
+
+  // Get memberships
+  const memberships = await db
+    .select({
+      id: communityMemberships.id,
+      communityId: communityMemberships.communityId,
+      role: communityMemberships.role,
+      status: communityMemberships.status,
+      joinedAt: communityMemberships.createdAt,
+      communityName: communities.name,
+    })
+    .from(communityMemberships)
+    .innerJoin(communities, eq(communityMemberships.communityId, communities.id))
+    .where(eq(communityMemberships.userId, userId));
+
+  // Get order stats
+  const [{ value: totalOrders }] = await db
+    .select({ count: count() })
+    .from(orders)
+    .where(eq(orders.customerId, userId));
+
+  const [{ value: totalSpent }] = await db
+    .select({ value: sql<string>`COALESCE(SUM(${orders.total}::numeric), 0)` })
+    .from(orders)
+    .where(eq(orders.customerId, userId));
+
+  // Get recent orders
+  const recentOrders = await db
+    .select({
+      id: orders.id,
+      orderNumber: orders.orderNumber,
+      total: orders.total,
+      orderStatus: orders.orderStatus,
+      paymentStatus: orders.paymentStatus,
+      createdAt: orders.createdAt,
+    })
+    .from(orders)
+    .where(eq(orders.customerId, userId))
+    .orderBy(desc(orders.createdAt))
+    .limit(10);
+
+  return c.json({
+    data: {
+      ...user,
+      memberships,
+      orderStats: { totalOrders, totalSpent },
+      recentOrders,
+    },
+  });
+});
+
 export default adminRoutes;

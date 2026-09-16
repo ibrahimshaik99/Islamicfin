@@ -14,7 +14,9 @@ import servicesRoutes from './services/routes';
 import zakatRoutes from './zakat/routes';
 import crowdfundingRoutes from './crowdfunding/routes';
 import financeRoutes from './finance/routes';
+import financeRequestRoutes from './finance/finance-request-routes';
 import adminRoutes from './admin/routes';
+import returnRoutes from './orders/return-routes';
 import membershipRequestRoutes from './membership-requests/routes';
 import { authMiddleware } from './auth/middleware';
 
@@ -75,6 +77,9 @@ app.route('/api/v1/communities', marketplaceRoutes);
 // Order routes
 app.route('/api/v1/communities', orderRoutes);
 
+// Return routes
+app.route('/api/v1/communities', returnRoutes);
+
 // Kameti routes
 app.route('/api/v1/communities', kametiRoutes);
 
@@ -92,6 +97,9 @@ app.route('/api/v1/communities', crowdfundingRoutes);
 
 // Finance routes
 app.route('/api/v1/communities', financeRoutes);
+
+// Finance request routes
+app.route('/api/v1/communities', financeRequestRoutes);
 
 // Admin routes (Super Admin only)
 app.route('/api/v1/admin', adminRoutes);

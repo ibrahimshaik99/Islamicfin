@@ -4,6 +4,7 @@ import { CartProvider } from './context/CartContext';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ProtectedRoute, GuestRoute } from './components/ProtectedRoute';
 import { CommunityGuard } from './components/CommunityGuard';
+import { adminNav } from './lib/navigation';
 
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/auth/LoginPage';
@@ -29,6 +30,8 @@ import MerchantsPage, { MerchantDetail } from './pages/admin/MerchantsPage';
 import AuditLogsPage from './pages/admin/AuditLogsPage';
 import ShariahPage from './pages/admin/ShariahPage';
 import AdminApprovalsPage from './pages/admin/ApprovalsPage';
+import AdminOrdersPage from './pages/admin/OrdersPage';
+import AdminFinanceRequestsPage from './pages/FinanceRequestPage';
 
 import CommunityMembersPage from './pages/community/MembersPage';
 import CommunityGroupsPage from './pages/community/GroupsPage';
@@ -47,6 +50,7 @@ import CommunityMessagesPage from './pages/community/MessagesPage';
 import CommunityReportsPage from './pages/community/ReportsPage';
 import CommunitySettingsPage from './pages/community/SettingsPage';
 import CommunityApprovalsPage from './pages/community/ApprovalsPage';
+import CommunityFinanceRequestsPage from './pages/community/FinanceRequestsPage';
 
 import MerchantProductsPage from './pages/merchant/ProductsPage';
 import MerchantCategoriesPage from './pages/merchant/CategoriesPage';
@@ -59,6 +63,8 @@ import MerchantSettingsPage from './pages/merchant/SettingsPage';
 import MerchantFinancePage from './pages/merchant/FinancePage';
 import MerchantMessagesPage from './pages/merchant/MerchantMessagesPage';
 import MerchantApplyPage from './pages/merchant/MerchantApplyPage';
+import MerchantOrderReturnsPage from './pages/merchant/OrderReturnsPage';
+import MerchantFinanceRequestsPage from './pages/merchant/MerchantFinanceRequestsPage';
 
 import { CustomerShell } from './pages/customer/CustomerShell';
 import CustomerHome from './pages/customer/CustomerHome';
@@ -79,6 +85,7 @@ import CustomerFinancePage from './pages/customer/CustomerFinancePage';
 import FinanceRequestPage from './pages/customer/FinanceRequestPage';
 import CustomerProfilePage from './pages/customer/CustomerProfilePage';
 import CustomerMorePage from './pages/customer/CustomerMorePage';
+import CustomerFinanceRequestsPage from './pages/customer/CustomerFinanceRequestsPage';
 
 function App() {
   return (
@@ -123,6 +130,8 @@ function App() {
               <Route path="/admin/audit" element={<ProtectedRoute><AuditLogsPage /></ProtectedRoute>} />
               <Route path="/admin/shariah" element={<ProtectedRoute><ShariahPage /></ProtectedRoute>} />
               <Route path="/admin/approvals" element={<ProtectedRoute><AdminApprovalsPage /></ProtectedRoute>} />
+              <Route path="/admin/orders" element={<ProtectedRoute><AdminOrdersPage /></ProtectedRoute>} />
+              <Route path="/admin/finance-requests" element={<ProtectedRoute><AdminFinanceRequestsPage navItems={adminNav} navTitle="Super Admin" title="Finance Requests" canCreate={false} canManage={true} /></ProtectedRoute>} />
 
               {/* Community routes */}
               <Route path="/community" element={<ProtectedRoute><CommunityGuard><CommunityDashboard /></CommunityGuard></ProtectedRoute>} />
@@ -143,6 +152,7 @@ function App() {
               <Route path="/community/reports" element={<ProtectedRoute><CommunityGuard><CommunityReportsPage /></CommunityGuard></ProtectedRoute>} />
               <Route path="/community/settings" element={<ProtectedRoute><CommunityGuard><CommunitySettingsPage /></CommunityGuard></ProtectedRoute>} />
               <Route path="/community/approvals" element={<ProtectedRoute><CommunityGuard><CommunityApprovalsPage /></CommunityGuard></ProtectedRoute>} />
+              <Route path="/community/finance-requests" element={<ProtectedRoute><CommunityGuard><CommunityFinanceRequestsPage /></CommunityGuard></ProtectedRoute>} />
 
               {/* Merchant routes */}
               <Route path="/merchant" element={<ProtectedRoute><MerchantDashboard /></ProtectedRoute>} />
@@ -157,6 +167,8 @@ function App() {
               <Route path="/merchant/finance" element={<ProtectedRoute><MerchantFinancePage /></ProtectedRoute>} />
               <Route path="/merchant/reports" element={<ProtectedRoute><MerchantReportsPage /></ProtectedRoute>} />
               <Route path="/merchant/settings" element={<ProtectedRoute><MerchantSettingsPage /></ProtectedRoute>} />
+              <Route path="/merchant/returns" element={<ProtectedRoute><MerchantOrderReturnsPage /></ProtectedRoute>} />
+              <Route path="/merchant/finance-requests" element={<ProtectedRoute><MerchantFinanceRequestsPage /></ProtectedRoute>} />
 
               {/* Customer mobile-first routes (/app) */}
               <Route path="/app" element={<ProtectedRoute><CustomerShell><CustomerHome /></CustomerShell></ProtectedRoute>} />
@@ -175,6 +187,7 @@ function App() {
               <Route path="/app/projects" element={<ProtectedRoute><CustomerShell><CustomerProjectsPage /></CustomerShell></ProtectedRoute>} />
               <Route path="/app/finance" element={<ProtectedRoute><CustomerShell><CustomerFinancePage /></CustomerShell></ProtectedRoute>} />
               <Route path="/app/finance/request" element={<ProtectedRoute><FinanceRequestPage /></ProtectedRoute>} />
+              <Route path="/app/finance-requests" element={<ProtectedRoute><CustomerFinanceRequestsPage /></ProtectedRoute>} />
               <Route path="/app/profile" element={<ProtectedRoute><CustomerShell><CustomerProfilePage /></CustomerShell></ProtectedRoute>} />
               <Route path="/app/more" element={<ProtectedRoute><CustomerShell><CustomerMorePage /></CustomerShell></ProtectedRoute>} />
 
