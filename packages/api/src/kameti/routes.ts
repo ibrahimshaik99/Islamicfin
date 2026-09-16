@@ -1198,8 +1198,20 @@ kametiRoutes.get(
     }
 
     const members = await db
-      .select()
+      .select({
+        id: kametiMembers.id,
+        kametiGroupId: kametiMembers.kametiGroupId,
+        userId: kametiMembers.userId,
+        position: kametiMembers.position,
+        status: kametiMembers.status,
+        joinedAt: kametiMembers.joinedAt,
+        createdAt: kametiMembers.createdAt,
+        updatedAt: kametiMembers.updatedAt,
+        name: users.name,
+        email: users.email,
+      })
       .from(kametiMembers)
+      .innerJoin(users, eq(kametiMembers.userId, users.id))
       .where(eq(kametiMembers.kametiGroupId, groupId))
       .orderBy(kametiMembers.position);
 

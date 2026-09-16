@@ -25,6 +25,7 @@ interface FinanceRequestPageProps {
   title?: string;
   canCreate?: boolean;
   canManage?: boolean;
+  apiPath?: string;
 }
 
 const REQUEST_TYPES: { value: RequestType; label: string }[] = [
@@ -46,9 +47,10 @@ const REQUEST_TYPE_FILTER_OPTIONS = [
   ...REQUEST_TYPES,
 ];
 
-export default function FinanceRequestPage({ navItems, navTitle, title = 'Finance Requests', canCreate = true, canManage = false }: FinanceRequestPageProps) {
+export default function FinanceRequestPage({ navItems, navTitle, title = 'Finance Requests', canCreate = true, canManage = false, apiPath }: FinanceRequestPageProps) {
   const { communityId } = useAuth();
   const prefix = communityId ? `/communities/${communityId}` : '';
+  const basePath = apiPath || `${prefix}/finance-requests`;
 
   const [statusFilter, setStatusFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
@@ -67,7 +69,7 @@ export default function FinanceRequestPage({ navItems, navTitle, title = 'Financ
   if (typeFilter) filters.requestType = typeFilter;
 
   const { data, pagination, loading, error, refetch, setPage, setFilters } = useAdminList<FinanceRequest>({
-    path: `${prefix}/finance-requests`,
+    path: basePath,
     limit: 20,
     filters,
   });
@@ -122,7 +124,7 @@ export default function FinanceRequestPage({ navItems, navTitle, title = 'Financ
   const handleStatusUpdate = async (id: string, newStatus: RequestStatus) => {
     setActionLoading(id);
     try {
-      await api(`${prefix}/finance-requests/${id}/status`, {
+      await api(`${basePath}/${id}/status`, {
         method: 'PATCH',
         body: { status: newStatus },
       });

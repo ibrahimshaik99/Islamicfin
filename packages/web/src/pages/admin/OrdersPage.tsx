@@ -7,7 +7,7 @@ import { Card, CardContent } from '../../components/ui';
 export default function OrdersPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  const { data, pagination, loading, error, refetch, setPage } = useAdminList<{ id: string; orderNumber: string; customerName: string; communityName: string; totalAmount: number; orderStatus: string; paymentStatus: string; paymentMethod: string; createdAt: string }>({
+  const { data, pagination, loading, error, refetch, setPage } = useAdminList<{ id: string; orderNumber: string; customerName: string; communityName: string; total: string; orderStatus: string; paymentStatus: string; paymentMethod: string; createdAt: string }>({
     path: '/admin/orders',
     search,
     filters: statusFilter ? { status: statusFilter } : {},
@@ -27,7 +27,7 @@ export default function OrdersPage() {
     { key: 'orderNumber', label: 'Order #', render: (item: { orderNumber: string }) => <span className="font-medium text-gray-900">{item.orderNumber}</span> },
     { key: 'customerName', label: 'Customer', render: (item: { customerName: string }) => <span className="text-gray-900">{item.customerName}</span> },
     { key: 'communityName', label: 'Community', render: (item: { communityName: string }) => <span className="text-gray-500 text-xs">{item.communityName}</span> },
-    { key: 'totalAmount', label: 'Total', render: (item: { totalAmount: number }) => <span className="font-medium text-gray-900">₹{item.totalAmount.toLocaleString('en-IN')}</span> },
+    { key: 'total', label: 'Total', render: (item: { total: string }) => <span className="font-medium text-gray-900">₹{parseFloat(item.total).toLocaleString('en-IN')}</span> },
     { key: 'orderStatus', label: 'Order Status', render: (item: { orderStatus: string }) => <StatusBadge status={item.orderStatus} /> },
     { key: 'paymentStatus', label: 'Payment Status', render: (item: { paymentStatus: string }) => <StatusBadge status={item.paymentStatus} /> },
     { key: 'paymentMethod', label: 'Payment Method', render: (item: { paymentMethod: string }) => <span className="text-gray-500 text-xs">{item.paymentMethod}</span> },

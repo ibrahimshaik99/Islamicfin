@@ -15,6 +15,7 @@ import {
   kametiGroups,
   riskFlags,
 } from '../db/schema';
+import { financeRequests } from '../db/schema/finance-requests';
 import { requireSuperAdmin } from './middleware';
 
 const adminRoutes = new Hono();
@@ -1383,6 +1384,83 @@ adminRoutes.get('/users/:userId', async (c) => {
       recentOrders,
     },
   });
+});
+
+// Admin: list all finance requests across platform
+adminRoutes.get('/finance-requests', async (c) => {
+  const page = parseInt(c.req.query('page') || '1');
+  const limit = parseInt(c.req.query('limit') || '20');
+  const status = c.req.query('status');
+  const requestType = c.req.query('requestType');
+  const offset = (page - 1) * limit;
+
+  const conditions = [];
+  if (status) conditions.push(eq(financeRequests.status, status as typeof financeRequests.status.enumValues[number]));
+  if (requestType) conditions.push(eq(financeRequests.requestType, requestType as typeof financeRequests.requestType.enumValues[number]));
+
+  const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+  const [{ value: total }] = await db
+    .select({ count: count() })
+    .from(financeRequests)
+    .where(whereClause);
+
+  const data = await db
+    .select({
+      id: financeRequests.id,
+      communityId: financeRequests.communityId,
+      userId: financeRequests.userId,
+      requestType: financeRequests.requestType,
+      amount: financeRequests.amount,
+      description: financeRequests.description,
+      contactPhone: financeRequests.contactPhone,
+      status: financeRequests.status,
+      createdAt: financeRequests.createdAt,
+      userName: users.name,
+      userEmail: users.email,
+      communityName: communities.name,
+    })
+    .from(financeRequests)
+    .innerJoin(users, eq(financeRequests.userId, users.id))
+    .innerJoin(communities, eq(financeRequests.communityId, communities.id))
+    .where(whereClause)
+    .orderBy(desc(financeRequests.createdAt))
+    .limit(limit)
+    .offset(offset);
+
+  return c.json({
+    data,
+    pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+  });
+});
+
+// Admin: update finance request status
+adminRoutes.patch('/finance-requests/:requestId/status', async (c) => {
+  const { requestId } = c.req.param();
+  const body = await c.req.json();
+  const result = z.object({ status: z.enum(['CONTACTED', 'CLOSED', 'PENDING']) }).safeParse(body);
+
+  if (!result.success) {
+    return c.json({ error: { code: 'VALIDATION_ERROR', message: 'Invalid status.' } }, 400);
+  }
+
+  const [existing] = await db
+    .select()
+    .from(financeRequests)
+    .where(eq(financeRequests.id, requestId))
+    .limit(1);
+
+  if (!existing) {
+    return c.json({ error: { code: 'NOT_FOUND', message: 'Finance request not found.' } }, 404);
+  }
+
+  const [updated] = await db
+    .update(financeRequests)
+    .set({ status: result.data.status, updatedAt: new Date() })
+    .where(eq(financeRequests.id, requestId))
+    .returning();
+
+  return c.json({ data: updated });
 });
 
 export default adminRoutes;

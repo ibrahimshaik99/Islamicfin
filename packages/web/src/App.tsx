@@ -131,7 +131,7 @@ function App() {
               <Route path="/admin/shariah" element={<ProtectedRoute><ShariahPage /></ProtectedRoute>} />
               <Route path="/admin/approvals" element={<ProtectedRoute><AdminApprovalsPage /></ProtectedRoute>} />
               <Route path="/admin/orders" element={<ProtectedRoute><AdminOrdersPage /></ProtectedRoute>} />
-              <Route path="/admin/finance-requests" element={<ProtectedRoute><AdminFinanceRequestsPage navItems={adminNav} navTitle="Super Admin" title="Finance Requests" canCreate={false} canManage={true} /></ProtectedRoute>} />
+              <Route path="/admin/finance-requests" element={<ProtectedRoute><AdminFinanceRequestsPage navItems={adminNav} navTitle="Super Admin" title="Finance Requests" canCreate={false} canManage={true} apiPath="/admin/finance-requests" /></ProtectedRoute>} />
 
               {/* Community routes */}
               <Route path="/community" element={<ProtectedRoute><CommunityGuard><CommunityDashboard /></CommunityGuard></ProtectedRoute>} />
