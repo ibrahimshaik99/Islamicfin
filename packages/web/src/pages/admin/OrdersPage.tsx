@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { DashboardLayout } from '../../components/DashboardLayout';
 import { adminNav } from '../../lib/navigation';
 import { useAdminList, StatusBadge, Pagination, FilterSelect, SearchInput, DataTable } from '../../components/admin/AdminComponents';
@@ -13,10 +13,6 @@ export default function OrdersPage() {
     filters: statusFilter ? { status: statusFilter } : {},
   });
   const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
-
-  useEffect(() => {
-    refetch();
-  }, [refetch]);
 
   const handleManualRefresh = useCallback(() => {
     refetch();

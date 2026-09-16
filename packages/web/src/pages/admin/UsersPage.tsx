@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { DashboardLayout } from '../../components/DashboardLayout';
 import { adminNav } from '../../lib/navigation';
@@ -117,10 +117,6 @@ export default function UsersPage() {
   const [createLoading, setCreateLoading] = useState(false);
   const [createError, setCreateError] = useState('');
   const [createSuccess, setCreateSuccess] = useState(false);
-
-  useEffect(() => {
-    refetch();
-  }, [refetch]);
 
   const handleManualRefresh = useCallback(() => {
     refetch();

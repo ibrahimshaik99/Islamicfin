@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { DashboardLayout } from '../../components/DashboardLayout';
 import { adminNav } from '../../lib/navigation';
 import { api } from '../../lib/api';
@@ -21,10 +21,6 @@ export default function ShariahPage() {
   const [confirmAction, setConfirmAction] = useState<{ id: string; action: 'REVIEWED' | 'NEEDS_REVISION' | 'ARCHIVED'; label: string } | null>(null);
   const [showComments, setShowComments] = useState<ShariahReview | null>(null);
   const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
-
-  useEffect(() => {
-    refetch();
-  }, [refetch]);
 
   const handleManualRefresh = useCallback(() => {
     refetch();

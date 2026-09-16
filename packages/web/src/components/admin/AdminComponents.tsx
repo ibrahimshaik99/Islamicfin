@@ -73,12 +73,14 @@ export function useAdminList<T extends Record<string, unknown>>({ path, page = 1
     return () => controller.abort();
   }, [fetchData]);
 
+  const refetch = useCallback(() => setRefreshKey((k) => k + 1), []);
+
   return {
     data,
     pagination,
     loading,
     error,
-    refetch: () => setRefreshKey((k) => k + 1),
+    refetch,
     setPage: setCurrentPage,
     setSearch: (s) => { setCurrentSearch(s); setCurrentPage(1); },
     setFilters: (f) => { setCurrentFilters(f); setCurrentPage(1); },

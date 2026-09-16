@@ -1287,7 +1287,7 @@ adminRoutes.get('/orders', async (c) => {
 
   const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
-  const [{ value: total }] = await db
+  const [{ count: total }] = await db
     .select({ count: count() })
     .from(orders)
     .where(whereClause);
@@ -1400,7 +1400,7 @@ adminRoutes.get('/finance-requests', async (c) => {
 
   const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
-  const [{ value: total }] = await db
+  const [{ count: total }] = await db
     .select({ count: count() })
     .from(financeRequests)
     .where(whereClause);
