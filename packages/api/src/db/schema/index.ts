@@ -85,3 +85,10 @@ export {
   financeRequestTypeEnum,
   financeRequestStatusEnum,
 } from './finance-requests';
+export {
+  communityDirectory,
+  directoryRoleEnum,
+  kametiPreferenceEnum,
+  financeTypeEnum,
+} from './community-directory';
+export { contractTemplates } from './community-directory';

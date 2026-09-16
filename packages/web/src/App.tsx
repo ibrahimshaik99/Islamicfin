@@ -51,6 +51,8 @@ import CommunityReportsPage from './pages/community/ReportsPage';
 import CommunitySettingsPage from './pages/community/SettingsPage';
 import CommunityApprovalsPage from './pages/community/ApprovalsPage';
 import CommunityFinanceRequestsPage from './pages/community/FinanceRequestsPage';
+import CommunityDirectoryPage from './pages/community/DirectoryPage';
+import CommunityContractsPage from './pages/community/ContractsPage';
 
 import MerchantProductsPage from './pages/merchant/ProductsPage';
 import MerchantCategoriesPage from './pages/merchant/CategoriesPage';
@@ -153,6 +155,8 @@ function App() {
               <Route path="/community/settings" element={<ProtectedRoute><CommunityGuard><CommunitySettingsPage /></CommunityGuard></ProtectedRoute>} />
               <Route path="/community/approvals" element={<ProtectedRoute><CommunityGuard><CommunityApprovalsPage /></CommunityGuard></ProtectedRoute>} />
               <Route path="/community/finance-requests" element={<ProtectedRoute><CommunityGuard><CommunityFinanceRequestsPage /></CommunityGuard></ProtectedRoute>} />
+              <Route path="/community/directory" element={<ProtectedRoute><CommunityGuard><CommunityDirectoryPage /></CommunityGuard></ProtectedRoute>} />
+              <Route path="/community/contracts" element={<ProtectedRoute><CommunityGuard><CommunityContractsPage /></CommunityGuard></ProtectedRoute>} />
 
               {/* Merchant routes */}
               <Route path="/merchant" element={<ProtectedRoute><MerchantDashboard /></ProtectedRoute>} />

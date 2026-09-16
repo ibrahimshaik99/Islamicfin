@@ -299,6 +299,26 @@ export default function FinancePage() {
       label: 'Legal',
       render: (item: Record<string, unknown>) => <StatusBadge status={String(item.legalStatus)} />,
     },
+    {
+      key: 'delete', label: '', className: 'text-right',
+      render: (item: Record<string, unknown>) => (
+        <button
+          onClick={async () => {
+            if (!confirm('Delete this contract?')) return;
+            try {
+              await fetch(`/api/v1/communities/${communityId}/finance/contracts/${item.id}`, { method: 'DELETE', credentials: 'include' });
+              setBanner({ type: 'success', message: 'Contract deleted.' });
+              refetch();
+            } catch {
+              setBanner({ type: 'error', message: 'Failed to delete contract.' });
+            }
+          }}
+          className="text-xs font-medium text-red-600 hover:text-red-700 px-2 py-1 rounded hover:bg-red-50 transition-colors"
+        >
+          Delete
+        </button>
+      ),
+    },
   ];
 
   return (

@@ -859,6 +859,52 @@ financeRoutes.post(
   },
 );
 
+// Delete finance contract
+financeRoutes.delete(
+  '/:communityId/finance/contracts/:contractId',
+  requireAuth,
+  tenantMiddleware,
+  requirePermission('finance:manage'),
+  async (c) => {
+    const tenant = c.get('tenant')!;
+    const user = c.get('user')!;
+    const communityId = tenant.communityId;
+    const contractId = c.req.param('contractId')!;
+
+    const [contract] = await db
+      .select()
+      .from(financeContracts)
+      .where(
+        and(
+          eq(financeContracts.id, contractId),
+          eq(financeContracts.communityId, communityId),
+        ),
+      )
+      .limit(1);
+
+    if (!contract) {
+      return c.json(
+        { error: { code: 'NOT_FOUND', message: 'Contract not found.' } },
+        404,
+      );
+    }
+
+    await db.delete(financeContracts).where(eq(financeContracts.id, contractId));
+
+    await db.insert(auditLogs).values({
+      communityId,
+      actorId: user.id,
+      action: 'finance.contract.delete',
+      entityType: 'finance_contract',
+      entityId: contractId,
+      oldValues: { title: contract.title, status: contract.status },
+      newValues: null,
+    });
+
+    return c.json({ data: { success: true } });
+  },
+);
+
 // ──────────────────────────────────────────
 // Create Mudarabah Contract (Profit-Sharing)
 // ──────────────────────────────────────────

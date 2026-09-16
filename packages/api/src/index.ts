@@ -15,6 +15,8 @@ import zakatRoutes from './zakat/routes';
 import crowdfundingRoutes from './crowdfunding/routes';
 import financeRoutes from './finance/routes';
 import financeRequestRoutes from './finance/finance-request-routes';
+import directoryRoutes from './community/directory-routes';
+import { superAdminDirectoryRoutes } from './community/directory-routes';
 import adminRoutes from './admin/routes';
 import returnRoutes from './orders/return-routes';
 import membershipRequestRoutes from './membership-requests/routes';
@@ -101,8 +103,14 @@ app.route('/api/v1/communities', financeRoutes);
 // Finance request routes
 app.route('/api/v1/communities', financeRequestRoutes);
 
+// Directory and contract routes
+app.route('/api/v1/communities', directoryRoutes);
+
 // Admin routes (Super Admin only)
 app.route('/api/v1/admin', adminRoutes);
+
+// Super admin directory and contracts
+app.route('/api/v1/admin', superAdminDirectoryRoutes);
 
 // Membership request routes (join/create community)
 app.route('/api/v1/membership-requests', membershipRequestRoutes);
