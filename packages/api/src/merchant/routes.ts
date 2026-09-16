@@ -77,6 +77,17 @@ merchantRoutes.post(
       })
       .returning();
 
+    // Promote membership role to MERCHANT so user can access merchant dashboard
+    await db
+      .update(communityMemberships)
+      .set({ role: 'MERCHANT', updatedAt: new Date() })
+      .where(
+        and(
+          eq(communityMemberships.userId, user.id),
+          eq(communityMemberships.communityId, communityId),
+        ),
+      );
+
     await db.insert(auditLogs).values({
       communityId,
       actorId: user.id,

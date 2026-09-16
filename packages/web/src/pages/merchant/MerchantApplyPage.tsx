@@ -41,6 +41,8 @@ export default function MerchantApplyPage() {
           upiId: upiId.trim() || undefined,
         },
       });
+      // Refresh session to pick up the new MERCHANT role
+      await loadSession();
       navigate('/merchant', { replace: true });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to submit application.';
