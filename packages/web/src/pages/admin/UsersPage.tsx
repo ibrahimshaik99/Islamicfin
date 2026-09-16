@@ -103,7 +103,7 @@ export function UserDetail() {
 export default function UsersPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  const { data, pagination, loading, error, refetch, setPage } = useAdminList<{ id: string; name: string; email: string; status: string; lastLogin: string | null; createdAt: string }>({
+  const { data, pagination, loading, error, refetch, setPage } = useAdminList<{ id: string; name: string; email: string; phone: string | null; status: string; lastLogin: string | null; createdAt: string }>({
     path: '/admin/users',
     search,
     filters: statusFilter ? { status: statusFilter } : {},
@@ -119,11 +119,7 @@ export default function UsersPage() {
   const [createSuccess, setCreateSuccess] = useState(false);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      refetch();
-      setLastRefreshed(new Date());
-    }, 30000);
-    return () => clearInterval(interval);
+    refetch();
   }, [refetch]);
 
   const handleManualRefresh = useCallback(() => {
@@ -170,10 +166,11 @@ export default function UsersPage() {
   const columns = [
     {
       key: 'name', label: 'User',
-      render: (item: { id: string; name: string; email: string }) => (
+      render: (item: { id: string; name: string; email: string; phone: string | null }) => (
         <div>
           <Link to={`/admin/users/${item.id}`} className="font-medium text-primary-600 hover:text-primary-700">{item.name}</Link>
           <p className="text-xs text-gray-500">{item.email}</p>
+          {item.phone && <p className="text-xs text-gray-400">{item.phone}</p>}
         </div>
       ),
     },

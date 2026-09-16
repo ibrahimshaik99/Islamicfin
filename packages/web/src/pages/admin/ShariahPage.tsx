@@ -23,11 +23,7 @@ export default function ShariahPage() {
   const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      refetch();
-      setLastRefreshed(new Date());
-    }, 30000);
-    return () => clearInterval(interval);
+    refetch();
   }, [refetch]);
 
   const handleManualRefresh = useCallback(() => {

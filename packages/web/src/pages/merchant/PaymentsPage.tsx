@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { DashboardLayout } from '../../components/DashboardLayout';
 import { merchantNav } from '../../lib/navigation';
 import { useAuth } from '../../context/AuthContext';
@@ -92,10 +92,7 @@ export default function PaymentsPage() {
     filters: statusFilter ? { paymentStatus: statusFilter } : {},
   });
 
-  useEffect(() => {
-    const interval = setInterval(() => refetch(), 15000);
-    return () => clearInterval(interval);
-  }, [refetch]);
+
 
   const flashSuccess = (msg: string) => {
     setSuccessMessage(msg);

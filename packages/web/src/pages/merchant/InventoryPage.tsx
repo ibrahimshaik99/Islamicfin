@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { DashboardLayout } from '../../components/DashboardLayout';
 import { merchantNav } from '../../lib/navigation';
 import { useAuth } from '../../context/AuthContext';
@@ -35,13 +35,7 @@ export default function InventoryPage() {
     return map;
   }, [categories]);
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      refetch();
-      setLastRefreshed(new Date());
-    }, 30000);
-    return () => clearInterval(interval);
-  }, [refetch]);
+
 
   const handleManualRefresh = useCallback(() => {
     refetch();

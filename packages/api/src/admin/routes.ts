@@ -349,6 +349,7 @@ adminRoutes.get('/users', async (c) => {
       id: users.id,
       name: users.name,
       email: users.email,
+      phone: users.phone,
       status: users.status,
       lastLogin: users.lastLogin,
       createdAt: users.createdAt,
@@ -554,6 +555,8 @@ adminRoutes.get('/merchants', async (c) => {
       communityId: merchants.communityId,
       userId: merchants.userId,
       businessName: merchants.businessName,
+      description: merchants.description,
+      phone: merchants.phone,
       verificationStatus: merchants.verificationStatus,
       createdAt: merchants.createdAt,
     })
@@ -563,13 +566,29 @@ adminRoutes.get('/merchants', async (c) => {
     .limit(limit)
     .offset(offset);
 
+  // Get order counts for each merchant
+  const merchantIds = data.map(m => m.id);
+  const orderCounts = merchantIds.length > 0
+    ? await db
+        .select({ merchantId: orders.merchantId, count: count() })
+        .from(orders)
+        .where(sql`${orders.merchantId} IN ${merchantIds}`)
+        .groupBy(orders.merchantId)
+    : [];
+  const orderCountMap = new Map(orderCounts.map(o => [o.merchantId, Number(o.count)]));
+
+  const dataWithOrders = data.map(m => ({
+    ...m,
+    orderCount: orderCountMap.get(m.id) ?? 0,
+  }));
+
   const total = await db
     .select({ count: count() })
     .from(merchants)
     .where(where);
 
   return c.json({
-    data,
+    data: dataWithOrders,
     pagination: {
       page,
       limit,

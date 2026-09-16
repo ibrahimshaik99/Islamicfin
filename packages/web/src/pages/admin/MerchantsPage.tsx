@@ -96,7 +96,7 @@ export function MerchantDetail() {
 export default function MerchantsPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  const { data, pagination, loading, error, refetch, setPage } = useAdminList<{ id: string; communityId: string; userId: string; businessName: string; verificationStatus: string; createdAt: string }>({
+  const { data, pagination, loading, error, refetch, setPage } = useAdminList<{ id: string; communityId: string; userId: string; businessName: string; description: string | null; phone: string | null; verificationStatus: string; createdAt: string; orderCount: number }>({
     path: '/admin/merchants',
     search,
     filters: statusFilter ? { status: statusFilter } : {},
@@ -104,11 +104,7 @@ export default function MerchantsPage() {
   const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      refetch();
-      setLastRefreshed(new Date());
-    }, 30000);
-    return () => clearInterval(interval);
+    refetch();
   }, [refetch]);
 
   const handleManualRefresh = useCallback(() => {
@@ -119,11 +115,16 @@ export default function MerchantsPage() {
   const columns = [
     {
       key: 'businessName', label: 'Merchant',
-      render: (item: { id: string; businessName: string }) => (
-        <span className="font-medium text-gray-900">{item.businessName}</span>
+      render: (item: { id: string; businessName: string; description: string | null; phone: string | null }) => (
+        <div>
+          <span className="font-medium text-gray-900">{item.businessName}</span>
+          {item.description && <p className="text-xs text-gray-500 truncate max-w-[200px]">{item.description}</p>}
+          {item.phone && <p className="text-xs text-gray-400">{item.phone}</p>}
+        </div>
       ),
     },
     { key: 'communityId', label: 'Community', render: (item: { communityId: string }) => <span className="text-gray-500 text-xs">{item.communityId.slice(0, 8)}...</span> },
+    { key: 'orderCount', label: 'Orders', render: (item: { orderCount: number }) => <span className="font-medium text-gray-900">{item.orderCount}</span> },
     { key: 'verificationStatus', label: 'Status', render: (item: { verificationStatus: string }) => <StatusBadge status={item.verificationStatus} /> },
     { key: 'createdAt', label: 'Created', render: (item: { createdAt: string }) => new Date(item.createdAt).toLocaleDateString() },
   ];

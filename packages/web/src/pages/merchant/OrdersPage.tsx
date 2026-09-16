@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { DashboardLayout } from '../../components/DashboardLayout';
 import { merchantNav } from '../../lib/navigation';
 import { useAuth } from '../../context/AuthContext';
@@ -193,13 +193,7 @@ export default function MerchantOrdersPage() {
     filters: statusFilter ? { status: statusFilter } : {},
   });
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      refetch();
-      setLastRefreshed(new Date());
-    }, 30000);
-    return () => clearInterval(interval);
-  }, [refetch]);
+
 
   const handleManualRefresh = useCallback(() => {
     refetch();

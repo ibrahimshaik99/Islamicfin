@@ -44,11 +44,6 @@ export default function AdminApprovalsPage() {
 
   useEffect(() => {
     loadRequests();
-    const interval = setInterval(() => {
-      loadRequests();
-      setLastRefresh(new Date());
-    }, 15000);
-    return () => clearInterval(interval);
   }, [loadRequests]);
 
   const handleApprove = async (request: MembershipRequest) => {
