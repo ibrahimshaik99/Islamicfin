@@ -382,7 +382,7 @@ marketplaceRoutes.post(
       }
     }
 
-    // Verify merchant exists and is approved for this community
+    // Verify merchant exists and belongs to this community (allow PENDING and APPROVED)
     const [merchant] = await db
       .select()
       .from(merchants)
@@ -391,14 +391,27 @@ marketplaceRoutes.post(
           eq(merchants.id, result.data.merchantId),
           eq(merchants.communityId, communityId),
           eq(merchants.userId, user.id),
-          eq(merchants.verificationStatus, 'APPROVED'),
         ),
       )
       .limit(1);
 
     if (!merchant) {
       return c.json(
-        { error: { code: 'FORBIDDEN', message: 'You do not have an approved merchant profile in this community.' } },
+        { error: { code: 'FORBIDDEN', message: 'You do not have a merchant profile in this community.' } },
+        403,
+      );
+    }
+
+    if (merchant.verificationStatus === 'SUSPENDED') {
+      return c.json(
+        { error: { code: 'FORBIDDEN', message: 'Your merchant profile has been suspended.' } },
+        403,
+      );
+    }
+
+    if (merchant.verificationStatus === 'REJECTED') {
+      return c.json(
+        { error: { code: 'FORBIDDEN', message: 'Your merchant profile was not approved.' } },
         403,
       );
     }

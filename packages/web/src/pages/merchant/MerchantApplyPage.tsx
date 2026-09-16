@@ -174,8 +174,8 @@ export default function MerchantApplyPage() {
                 onChange={(e) => setUpiId(e.target.value)}
               />
 
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-700">
-                Your application will be reviewed by your community admin. You will be able to create products once approved.
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-700">
+                Your application will be reviewed by your community admin. You can add products now — they'll be visible once approved.
               </div>
 
               <Button type="submit" loading={loading} className="w-full" size="lg">
