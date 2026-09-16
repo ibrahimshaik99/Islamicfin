@@ -10,7 +10,7 @@ export default function MerchantSettingsPage() {
   const { communityId } = useAuth();
   const prefix = communityId ? `/communities/${communityId}` : '';
 
-  const { merchant, loading, error, refetch } = useMerchantProfile(30000);
+  const { merchant, loading, error, refetch } = useMerchantProfile();
   const { mutate, loading: mutating } = useMutation();
 
   const isSuspended = merchant?.verificationStatus === 'SUSPENDED';

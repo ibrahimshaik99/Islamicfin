@@ -11,7 +11,7 @@ export default function MerchantDashboard() {
   const { communityId } = useAuth();
   const prefix = communityId ? `/communities/${communityId}` : '';
 
-  const { merchant } = useMerchantProfile(15000);
+  const { merchant } = useMerchantProfile();
   const { data: products, loading: pLoading } = useApi<Product[]>(`${prefix}/products?limit=200`);
   const { data: orders, loading: oLoading } = useApi<Order[]>(`${prefix}/orders?limit=200`);
 

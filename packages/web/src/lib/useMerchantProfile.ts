@@ -19,7 +19,7 @@ export interface MerchantProfile {
   [key: string]: unknown;
 }
 
-export function useMerchantProfile(refreshInterval = 30000) {
+export function useMerchantProfile() {
   const { communityId } = useAuth();
   const prefix = communityId ? `/communities/${communityId}` : '';
 
@@ -58,27 +58,6 @@ export function useMerchantProfile(refreshInterval = 30000) {
     fetchMerchant(controller.signal);
     return () => controller.abort();
   }, [fetchMerchant]);
-
-  useEffect(() => {
-    if (!prefix) return;
-    const interval = setInterval(() => fetchMerchant(), refreshInterval);
-    return () => clearInterval(interval);
-  }, [prefix, fetchMerchant, refreshInterval]);
-
-  useEffect(() => {
-    if (!prefix) return;
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        fetchMerchant();
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibility);
-    window.addEventListener('focus', handleVisibility);
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibility);
-      window.removeEventListener('focus', handleVisibility);
-    };
-  }, [prefix, fetchMerchant]);
 
   const refetch = useCallback(() => fetchMerchant(), [fetchMerchant]);
 

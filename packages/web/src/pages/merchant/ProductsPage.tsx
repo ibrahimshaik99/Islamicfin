@@ -75,7 +75,7 @@ export default function ProductsPage() {
   const { mutate, loading: mutating, error: mutateError } = useMutation();
   const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
 
-  const { merchant, loading: merchantLoading, refetch: refetchMerchant } = useMerchantProfile(15000);
+  const { merchant, loading: merchantLoading, refetch: refetchMerchant } = useMerchantProfile();
   const { data: categories = [] } = useApi<Category[]>(`${prefix}/categories`);
 
   const { data, pagination, loading, error, refetch, setPage } = useAdminList<Product>({
@@ -307,20 +307,30 @@ export default function ProductsPage() {
         </div>
       )}
 
-      {!merchantLoading && merchant && merchant.verificationStatus !== 'APPROVED' && (
-        <div className={`mb-4 flex items-center gap-2 rounded-xl px-4 py-3 text-sm animate-in fade-in ${
-          merchant.verificationStatus === 'PENDING'
-            ? 'bg-blue-50 border border-blue-200 text-blue-700'
-            : merchant.verificationStatus === 'SUSPENDED'
-            ? 'bg-red-50 border border-red-200 text-red-700'
-            : 'bg-amber-50 border border-amber-200 text-amber-700'
-        }`}>
+      {!merchantLoading && merchant && merchant.verificationStatus === 'SUSPENDED' && (
+        <div className="mb-4 flex items-center gap-2 rounded-xl px-4 py-3 text-sm bg-red-50 border border-red-200 text-red-700 animate-in fade-in">
           <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
           </svg>
-          {merchant.verificationStatus === 'PENDING' && 'Your merchant profile is pending approval. You will be able to create products once approved.'}
-          {merchant.verificationStatus === 'SUSPENDED' && 'Your merchant profile has been suspended. Please contact your community admin.'}
-          {merchant.verificationStatus === 'REJECTED' && 'Your merchant profile was not approved. Please contact your community admin.'}
+          Your merchant profile has been suspended. Please contact your community admin.
+        </div>
+      )}
+
+      {!merchantLoading && merchant && merchant.verificationStatus === 'REJECTED' && (
+        <div className="mb-4 flex items-center gap-2 rounded-xl px-4 py-3 text-sm bg-amber-50 border border-amber-200 text-amber-700 animate-in fade-in">
+          <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+          </svg>
+          Your merchant profile was not approved. Please contact your community admin.
+        </div>
+      )}
+
+      {!merchantLoading && merchant && merchant.verificationStatus === 'PENDING' && (
+        <div className="mb-4 flex items-center gap-2 rounded-xl px-4 py-3 text-sm bg-blue-50 border border-blue-200 text-blue-700 animate-in fade-in">
+          <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+          </svg>
+          Your merchant profile is pending approval. You can add products but they won't be visible until approved.
         </div>
       )}
 
@@ -349,7 +359,6 @@ export default function ProductsPage() {
                   else { setShowForm(true); setFormError(''); setFormSuccess(''); }
                 }}
                 variant={showForm ? 'secondary' : 'primary'}
-                disabled={!showForm && (!merchant || merchant.verificationStatus !== 'APPROVED')}
               >
                 {showForm ? 'Cancel' : '+ Add Product'}
               </Button>

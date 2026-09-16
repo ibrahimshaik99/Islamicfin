@@ -23,7 +23,6 @@ export function useRealtimeConversations(
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const prefix = communityId ? `/communities/${communityId}` : '';
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchConversations = useCallback(async () => {
     if (!communityId) return;
@@ -39,11 +38,8 @@ export function useRealtimeConversations(
     }
   }, [communityId, prefix]);
 
-  // Initial fetch + polling
   useEffect(() => {
     fetchConversations();
-    pollRef.current = setInterval(() => fetchConversations(), 5000);
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [fetchConversations]);
 
   const createConversation = useCallback(async (type: string, memberIds: string[]): Promise<Conversation | null> => {
@@ -80,7 +76,6 @@ export function useRealtimeMessages(
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const prefix = communityId ? `/communities/${communityId}` : '';
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const socketRef = useRef<Socket | null>(null);
 
   const fetchMessages = useCallback(async () => {
@@ -97,7 +92,10 @@ export function useRealtimeMessages(
     }
   }, [communityId, conversationId, prefix]);
 
-  // Socket.IO connection (will fail gracefully if server not running)
+  useEffect(() => {
+    fetchMessages();
+  }, [fetchMessages]);
+
   useEffect(() => {
     if (!conversationId || !SOCKET_URL) return;
 
@@ -133,17 +131,8 @@ export function useRealtimeMessages(
         socket.disconnect();
       };
     } catch {
-      // Socket.IO server not available, will use polling instead
+      // Socket.IO server not available
     }
-  }, [conversationId, fetchMessages]);
-
-  // Polling fallback (always runs as backup)
-  useEffect(() => {
-    if (!conversationId) return;
-    setLoading(true);
-    fetchMessages();
-    pollRef.current = setInterval(() => fetchMessages(), 2000);
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [conversationId, fetchMessages]);
 
   const sendMessage = useCallback(async (body: string, messageType = 'TEXT', attachmentUrl?: string): Promise<boolean> => {
@@ -160,7 +149,6 @@ export function useRealtimeMessages(
           return [...prev, msg as Message];
         });
       }
-      // Notify Socket.IO if connected
       if (socketRef.current?.connected) {
         socketRef.current.emit('send-message', { conversationId, message: msg });
       }
