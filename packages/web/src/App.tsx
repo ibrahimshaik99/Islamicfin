@@ -32,6 +32,7 @@ import ShariahPage from './pages/admin/ShariahPage';
 import AdminApprovalsPage from './pages/admin/ApprovalsPage';
 import AdminOrdersPage from './pages/admin/OrdersPage';
 import AdminFinanceRequestsPage from './pages/FinanceRequestPage';
+import AdminDirectoryPage from './pages/admin/DirectoryPage';
 
 import CommunityMembersPage from './pages/community/MembersPage';
 import CommunityGroupsPage from './pages/community/GroupsPage';
@@ -134,6 +135,7 @@ function App() {
               <Route path="/admin/approvals" element={<ProtectedRoute><AdminApprovalsPage /></ProtectedRoute>} />
               <Route path="/admin/orders" element={<ProtectedRoute><AdminOrdersPage /></ProtectedRoute>} />
               <Route path="/admin/finance-requests" element={<ProtectedRoute><AdminFinanceRequestsPage navItems={adminNav} navTitle="Super Admin" title="Finance Requests" canCreate={false} canManage={true} apiPath="/admin/finance-requests" /></ProtectedRoute>} />
+              <Route path="/admin/directory" element={<ProtectedRoute><AdminDirectoryPage /></ProtectedRoute>} />
 
               {/* Community routes */}
               <Route path="/community" element={<ProtectedRoute><CommunityGuard><CommunityDashboard /></CommunityGuard></ProtectedRoute>} />

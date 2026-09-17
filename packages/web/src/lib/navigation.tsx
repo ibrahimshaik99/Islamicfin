@@ -49,6 +49,7 @@ export const adminNav: NavItem[] = [
   { label: 'Communities', path: '/admin/communities', icon: icons.community },
   { label: 'Users', path: '/admin/users', icon: icons.users },
   { label: 'Merchants', path: '/admin/merchants', icon: icons.shop },
+  { label: 'Directory', path: '/admin/directory', icon: icons.members },
   { label: 'Orders', path: '/admin/orders', icon: icons.orders },
   { label: 'Finance Requests', path: '/admin/finance-requests', icon: icons.finance },
   { label: 'Shariah', path: '/admin/shariah', icon: icons.shariah },
