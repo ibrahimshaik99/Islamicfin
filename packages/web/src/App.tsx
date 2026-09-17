@@ -42,6 +42,7 @@ import CommunityMarketplacePage from './pages/community/MarketplacePage';
 import CommunityOrdersPage from './pages/community/OrdersPage';
 import CommunityKametiPage from './pages/community/KametiPage';
 import CommunityKametiDetailPage from './pages/community/KametiDetailPage';
+import CommunityKametiGroupChatPage from './pages/community/KametiGroupChatPage';
 import CommunityServicesPage from './pages/community/ServicesPage';
 import CommunitySadaqahPage from './pages/community/SadaqahPage';
 import CommunityQardHasanPage from './pages/community/QardHasanPage';
@@ -79,6 +80,7 @@ import OrdersPage from './pages/customer/OrdersPage';
 import OrderDetailPage from './pages/customer/OrderDetailPage';
 import CustomerKametiPage from './pages/customer/CustomerKametiPage';
 import CustomerKametiDetailPage from './pages/customer/CustomerKametiDetailPage';
+import CustomerKametiGroupChatPage from './pages/customer/CustomerKametiGroupChatPage';
 import CustomerMessagesPage from './pages/customer/CustomerMessagesPage';
 import CustomerServicesPage from './pages/customer/CustomerServicesPage';
 import CustomerZakatPage from './pages/customer/CustomerZakatPage';
@@ -147,6 +149,7 @@ function App() {
               <Route path="/community/orders" element={<ProtectedRoute><CommunityGuard><CommunityOrdersPage /></CommunityGuard></ProtectedRoute>} />
               <Route path="/community/kameti" element={<ProtectedRoute><CommunityGuard><CommunityKametiPage /></CommunityGuard></ProtectedRoute>} />
               <Route path="/community/kameti/:groupId" element={<ProtectedRoute><CommunityGuard><CommunityKametiDetailPage /></CommunityGuard></ProtectedRoute>} />
+              <Route path="/community/kameti/:groupId/chat" element={<ProtectedRoute><CommunityGuard><CommunityKametiGroupChatPage /></CommunityGuard></ProtectedRoute>} />
               <Route path="/community/services" element={<ProtectedRoute><CommunityGuard><CommunityServicesPage /></CommunityGuard></ProtectedRoute>} />
               <Route path="/community/sadaqah" element={<ProtectedRoute><CommunityGuard><CommunitySadaqahPage /></CommunityGuard></ProtectedRoute>} />
               <Route path="/community/qard-hasan" element={<ProtectedRoute><CommunityGuard><CommunityQardHasanPage /></CommunityGuard></ProtectedRoute>} />
@@ -186,6 +189,7 @@ function App() {
               <Route path="/app/orders/:orderId" element={<ProtectedRoute><OrderDetailPage /></ProtectedRoute>} />
               <Route path="/app/kameti" element={<ProtectedRoute><CustomerShell><CustomerKametiPage /></CustomerShell></ProtectedRoute>} />
               <Route path="/app/kameti/:groupId" element={<ProtectedRoute><CustomerKametiDetailPage /></ProtectedRoute>} />
+              <Route path="/app/kameti/:groupId/chat" element={<ProtectedRoute><CustomerKametiGroupChatPage /></ProtectedRoute>} />
               <Route path="/app/messages" element={<ProtectedRoute><CustomerShell><CustomerMessagesPage /></CustomerShell></ProtectedRoute>} />
               <Route path="/app/services" element={<ProtectedRoute><CustomerShell><CustomerServicesPage /></CustomerShell></ProtectedRoute>} />
               <Route path="/app/zakat" element={<ProtectedRoute><CustomerShell><CustomerZakatPage /></CustomerShell></ProtectedRoute>} />

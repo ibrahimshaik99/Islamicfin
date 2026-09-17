@@ -7,6 +7,8 @@ const SOCKET_URL = window.location.hostname === 'localhost'
   ? `http://localhost:8789`
   : '';
 
+const POLL_INTERVAL = 4000;
+
 interface UseRealtimeConversationsReturn {
   conversations: Conversation[];
   loading: boolean;
@@ -40,6 +42,13 @@ export function useRealtimeConversations(
 
   useEffect(() => {
     fetchConversations();
+  }, [fetchConversations]);
+
+  // Polling fallback for production (when Socket.IO is unavailable)
+  useEffect(() => {
+    if (SOCKET_URL) return;
+    const interval = setInterval(fetchConversations, POLL_INTERVAL);
+    return () => clearInterval(interval);
   }, [fetchConversations]);
 
   const createConversation = useCallback(async (type: string, memberIds: string[]): Promise<Conversation | null> => {
@@ -96,6 +105,7 @@ export function useRealtimeMessages(
     fetchMessages();
   }, [fetchMessages]);
 
+  // Socket.IO for local dev
   useEffect(() => {
     if (!conversationId || !SOCKET_URL) return;
 
@@ -133,6 +143,13 @@ export function useRealtimeMessages(
     } catch {
       // Socket.IO server not available
     }
+  }, [conversationId, fetchMessages]);
+
+  // Polling fallback for production
+  useEffect(() => {
+    if (!conversationId || SOCKET_URL) return;
+    const interval = setInterval(fetchMessages, POLL_INTERVAL);
+    return () => clearInterval(interval);
   }, [conversationId, fetchMessages]);
 
   const sendMessage = useCallback(async (body: string, messageType = 'TEXT', attachmentUrl?: string): Promise<boolean> => {

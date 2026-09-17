@@ -9,9 +9,18 @@ import {
 } from '../db/schema/messaging';
 import { users } from '../db/schema/users';
 import { auditLogs } from '../db/schema/audit';
+import { kametiMembers, kametiGroups } from '../db/schema/kameti';
 import { requireAuth } from '../auth/middleware';
 import { tenantMiddleware } from '../tenancy/middleware';
 import { requirePermission } from '../rbac/middleware';
+
+let emitToConversation: ((conversationId: string, event: string, data: unknown) => void) | null = null;
+try {
+  const socketServer = await import('../socket-server');
+  emitToConversation = socketServer.emitToConversation;
+} catch {
+  // Socket.IO server not available (production)
+}
 
 const messagingRoutes = new Hono();
 
@@ -94,11 +103,30 @@ async function enrichConversation(conv: typeof conversations.$inferSelect, curre
     }
   }
 
+  // For KAMETI conversations, get the group name
+  let kametiGroupName: string | null = null;
+  if (conv.type === 'KAMETI') {
+    const [kametiMember] = await db
+      .select({ kametiGroupId: kametiMembers.kametiGroupId })
+      .from(kametiMembers)
+      .innerJoin(conversationMembers, eq(conversationMembers.userId, kametiMembers.userId))
+      .where(eq(conversationMembers.conversationId, conv.id))
+      .limit(1);
+    if (kametiMember) {
+      const [group] = await db
+        .select({ name: kametiGroups.name })
+        .from(kametiGroups)
+        .where(eq(kametiGroups.id, kametiMember.kametiGroupId))
+        .limit(1);
+      kametiGroupName = group?.name || 'Kameti Group';
+    }
+  }
+
   return {
     ...conv,
     memberCount,
     lastMessage: lastMsg || undefined,
-    name: conv.type === 'DIRECT' ? otherMemberName : conv.type,
+    name: conv.type === 'DIRECT' ? otherMemberName : (conv.type === 'KAMETI' && kametiGroupName) ? kametiGroupName : conv.type,
     otherMemberId,
   };
 }
@@ -395,6 +423,11 @@ messagingRoutes.post(
       ...message,
       senderName: sender?.name || 'Unknown',
     };
+
+    // Emit real-time event via Socket.IO if available
+    if (emitToConversation) {
+      emitToConversation(conversationId, 'new-message', enrichedMessage);
+    }
 
     return c.json({ data: enrichedMessage }, 201);
   },
