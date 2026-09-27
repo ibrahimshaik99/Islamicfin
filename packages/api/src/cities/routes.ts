@@ -24,7 +24,7 @@ cityRoutes.get('/cities', requireAuth, async (c) => {
       status: cities.status,
       activeCommunityCount: sql<number>`(
         select count(*) from communities c
-        where c.city_id = ${cities.id} and c.status = 'ACTIVE'
+        where c.city_id = "cities"."id" and c.status = 'ACTIVE'
       )`,
     })
     .from(cities)
@@ -136,7 +136,7 @@ superAdminCityRoutes.get('/cities', async (c) => {
       slug: cities.slug,
       status: cities.status,
       createdAt: cities.createdAt,
-      communityCount: sql<number>`(select count(*) from communities c where c.city_id = ${cities.id})`,
+      communityCount: sql<number>`(select count(*) from communities c where c.city_id = "cities"."id")`,
     })
     .from(cities)
     .orderBy(asc(cities.name));
