@@ -1,0 +1,1 @@
+ALTER TABLE "kameti_contributions" ADD COLUMN "paid_at" timestamp with time zone;

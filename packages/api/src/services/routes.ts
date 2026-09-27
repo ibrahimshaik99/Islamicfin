@@ -375,6 +375,12 @@ servicesRoutes.post(
 
     // Validate service exists and is active
     const serviceListingId = result.data.listingId || result.data.serviceId;
+    if (!serviceListingId) {
+      return c.json(
+        { error: { code: 'VALIDATION_ERROR', message: 'Listing ID is required' } },
+        400,
+      );
+    }
     const [service] = await db
       .select()
       .from(serviceListings)

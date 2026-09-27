@@ -1,8 +1,6 @@
 import { createServer } from 'http';
 import { Server } from 'socket.io';
-import { neon } from '@neondatabase/serverless';
 
-const DATABASE_URL = process.env.DATABASE_URL || '';
 const PORT = parseInt(process.env.PORT || '8789', 10);
 
 const httpServer = createServer();
@@ -12,8 +10,6 @@ const io = new Server(httpServer, {
     credentials: true,
   },
 });
-
-const sql = neon(DATABASE_URL);
 
 // Track online users: userId -> Set of socket ids
 const onlineUsers = new Map<string, Set<string>>();
@@ -79,6 +75,9 @@ httpServer.on('request', (req, res) => {
   }
 });
 
-httpServer.listen(PORT, () => {
-  console.log(`[Socket.IO] Server running on port ${PORT}`);
-});
+// Do not bind the socket port during tests (multiple test files import this module)
+if (!process.env.VITEST && process.env.NODE_ENV !== 'test') {
+  httpServer.listen(PORT, () => {
+    console.log(`[Socket.IO] Server running on port ${PORT}`);
+  });
+}

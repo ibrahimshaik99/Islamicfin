@@ -3,8 +3,15 @@ import { Link, useParams } from 'react-router-dom';
 import { DashboardLayout } from '../../components/DashboardLayout';
 import { adminNav } from '../../lib/navigation';
 import { api } from '../../lib/api';
+import { useApi } from '../../lib/useApi';
 import { useAdminList, useAdminDetail, SearchInput, FilterSelect, Pagination, StatusBadge, DataTable, ConfirmDialog } from '../../components/admin/AdminComponents';
 import { LoadingState, ErrorState, Card, CardContent, Button } from '../../components/ui';
+
+interface CityOption {
+  id: string;
+  name: string;
+  state: string;
+}
 
 /* ───── Community Detail ───── */
 
@@ -139,10 +146,11 @@ export default function CommunitiesPage() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<{ id: string; action: 'activate' | 'suspend'; name: string } | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const [createForm, setCreateForm] = useState({ name: '', slug: '', description: '' });
+  const [createForm, setCreateForm] = useState({ name: '', slug: '', description: '', cityId: '' });
   const [createLoading, setCreateLoading] = useState(false);
   const [createError, setCreateError] = useState('');
   const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
+  const { data: cities } = useApi<CityOption[]>('/admin/cities');
 
   const handleManualRefresh = useCallback(() => {
     refetch();
@@ -172,10 +180,11 @@ export default function CommunitiesPage() {
           name: createForm.name,
           slug: createForm.slug.toLowerCase().replace(/\s+/g, '-'),
           description: createForm.description || undefined,
+          cityId: createForm.cityId,
         },
       });
       setShowCreateForm(false);
-      setCreateForm({ name: '', slug: '', description: '' });
+      setCreateForm({ name: '', slug: '', description: '', cityId: '' });
       refetch();
     } catch (err: unknown) {
       setCreateError(err instanceof Error ? err.message : 'Failed to create community');
@@ -192,6 +201,12 @@ export default function CommunitiesPage() {
       ),
     },
     { key: 'slug', label: 'Slug', render: (item: CommunityItem) => <span className="text-gray-500">/{item.slug}</span> },
+    {
+      key: 'city', label: 'City',
+      render: (item: CommunityItem) => (
+        <span className="text-gray-500">{item.city ? `${item.city}${item.state ? `, ${item.state}` : ''}` : '—'}</span>
+      ),
+    },
     { key: 'status', label: 'Status', render: (item: CommunityItem) => <StatusBadge status={item.status} /> },
     { key: 'createdAt', label: 'Created', render: (item: CommunityItem) => new Date(item.createdAt).toLocaleDateString() },
     {
@@ -284,6 +299,19 @@ export default function CommunitiesPage() {
                 <input type="text" value={createForm.slug} onChange={(e) => setCreateForm({ ...createForm, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-') })} placeholder="community-slug" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none font-mono" />
               </div>
               <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">City *</label>
+                <select
+                  value={createForm.cityId}
+                  onChange={(e) => setCreateForm({ ...createForm, cityId: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none bg-white"
+                >
+                  <option value="">Select a city...</option>
+                  {(cities || []).map((city) => (
+                    <option key={city.id} value={city.id}>{city.name}, {city.state}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">Description (optional)</label>
                 <textarea value={createForm.description} onChange={(e) => setCreateForm({ ...createForm, description: e.target.value })} placeholder="Brief description..." className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none resize-none" rows={2} />
               </div>
@@ -292,7 +320,7 @@ export default function CommunitiesPage() {
               <button onClick={() => setShowCreateForm(false)} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">Cancel</button>
               <button
                 onClick={handleCreate}
-                disabled={!createForm.name || !createForm.slug || createLoading}
+                disabled={!createForm.name || !createForm.slug || !createForm.cityId || createLoading}
                 className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50"
               >
                 {createLoading ? 'Creating...' : 'Create'}

@@ -13,6 +13,7 @@ import {
   merchants,
   products,
   orders,
+  cities,
 } from '../db/schema';
 import { requireAuth } from '../auth/middleware';
 import { tenantMiddleware } from '../tenancy/middleware';
@@ -27,7 +28,7 @@ communityRoutes.get(
   tenantMiddleware,
   requirePermission('community:read'),
   async (c) => {
-    const tenant = c.get('tenant')!!;
+    const tenant = c.get('tenant')!;
     const communityId = tenant.communityId;
 
     const [community] = await db
@@ -827,8 +828,7 @@ communityRoutes.patch(
         name: z.string().min(1).max(255).optional(),
         description: z.string().optional(),
         address: z.string().optional(),
-        city: z.string().max(255).optional(),
-        state: z.string().max(255).optional(),
+        cityId: z.string().uuid().optional(),
         country: z.string().max(100).optional(),
         contactPhone: z.string().max(20).optional(),
         logoUrl: z.string().optional(),
@@ -842,9 +842,32 @@ communityRoutes.patch(
       );
     }
 
+    const { cityId, ...rest } = result.data;
+    const patch: Record<string, unknown> = { ...rest };
+
+    // City changes go through the normalized cities table (free-text city edits are rejected)
+    if (cityId !== undefined) {
+      const [city] = await db
+        .select()
+        .from(cities)
+        .where(eq(cities.id, cityId))
+        .limit(1);
+
+      if (!city || city.status !== 'ACTIVE') {
+        return c.json(
+          { error: { code: 'VALIDATION_ERROR', message: 'Selected city is not available' } },
+          400,
+        );
+      }
+
+      patch.cityId = city.id;
+      patch.city = city.name;
+      patch.state = city.state;
+    }
+
     const [updated] = await db
       .update(communities)
-      .set({ ...result.data, updatedAt: new Date() })
+      .set({ ...patch, updatedAt: new Date() })
       .where(eq(communities.id, communityId))
       .returning();
 

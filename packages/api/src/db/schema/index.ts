@@ -92,3 +92,12 @@ export {
   financeTypeEnum,
 } from './community-directory';
 export { contractTemplates } from './community-directory';
+
+export { cities, cityStatusEnum } from './cities';
+export {
+  bnplContracts,
+  bnplContractStatusEnum,
+  bnplInstallments,
+  bnplInstallmentFrequencyEnum,
+  bnplInstallmentStatusEnum,
+} from './bnpl';

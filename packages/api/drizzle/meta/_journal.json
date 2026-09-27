@@ -43,6 +43,27 @@
       "when": 1789281514628,
       "tag": "0005_warm_squirrel_girl",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790507189827,
+      "tag": "0006_huge_mentor",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790507317994,
+      "tag": "0007_previous_groot",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790509253706,
+      "tag": "0008_lyrical_brood",
+      "breakpoints": true
     }
   ]
 }

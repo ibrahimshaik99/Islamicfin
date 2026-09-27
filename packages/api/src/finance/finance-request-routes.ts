@@ -83,7 +83,7 @@ financeRequestRoutes.get(
     const conditions = [eq(financeRequests.communityId, communityId)];
 
     // Customer: only their own requests
-    if (c.get('role') === 'CUSTOMER') {
+    if (tenant.role === 'CUSTOMER') {
       conditions.push(eq(financeRequests.userId, user.id));
     }
 

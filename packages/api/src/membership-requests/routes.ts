@@ -4,22 +4,44 @@ import { eq, and, desc, count, inArray } from 'drizzle-orm';
 import { db } from '../db';
 import { membershipRequests } from '../db/schema/membership-requests';
 import { communityMemberships, communities } from '../db/schema/communities';
+import { cities } from '../db/schema/cities';
 import { requireAuth } from '../auth/middleware';
 
 const membershipRequestRoutes = new Hono();
 
-// List active communities (for join dropdown)
+// List active communities (for join dropdown), optionally filtered by city
 membershipRequestRoutes.get(
   '/communities',
   requireAuth,
   async (c) => {
+    const cityId = c.req.query('cityId');
+
     const activeCommunities = await db
       .select()
       .from(communities)
-      .where(eq(communities.status, 'ACTIVE'))
+      .where(
+        cityId
+          ? and(eq(communities.status, 'ACTIVE'), eq(communities.cityId, cityId))
+          : eq(communities.status, 'ACTIVE'),
+      )
       .orderBy(communities.name);
 
     return c.json({ data: activeCommunities });
+  },
+);
+
+// List cities (for onboarding city step)
+membershipRequestRoutes.get(
+  '/cities',
+  requireAuth,
+  async (c) => {
+    const rows = await db
+      .select()
+      .from(cities)
+      .where(eq(cities.status, 'ACTIVE'))
+      .orderBy(cities.name);
+
+    return c.json({ data: rows });
   },
 );
 
@@ -29,6 +51,7 @@ const createRequestSchema = z.object({
   communityId: z.string().uuid().optional(),
   communityName: z.string().max(255).optional(),
   communitySlug: z.string().max(255).optional(),
+  cityId: z.string().uuid().optional(),
   message: z.string().max(1000).optional(),
 });
 
@@ -47,7 +70,7 @@ membershipRequestRoutes.post(
       );
     }
 
-    const { requestType, communityId, communityName, communitySlug, message } = result.data;
+    const { requestType, communityId, communityName, communitySlug, cityId, message } = result.data;
 
     // For JOIN_COMMUNITY, communityId is required
     if (requestType === 'JOIN_COMMUNITY' && !communityId) {
@@ -61,6 +84,22 @@ membershipRequestRoutes.post(
     if (requestType === 'CREATE_COMMUNITY' && (!communityName || !communitySlug)) {
       return c.json(
         { error: { code: 'VALIDATION_ERROR', message: 'Community name and slug are required for create requests' } },
+        400,
+      );
+    }
+
+    // City is mandatory for both flows (city-based tenant selection)
+    if (!cityId) {
+      return c.json(
+        { error: { code: 'VALIDATION_ERROR', message: 'City selection is required' } },
+        400,
+      );
+    }
+
+    const [city] = await db.select().from(cities).where(eq(cities.id, cityId)).limit(1);
+    if (!city || city.status !== 'ACTIVE') {
+      return c.json(
+        { error: { code: 'VALIDATION_ERROR', message: 'Selected city is not available' } },
         400,
       );
     }
@@ -120,6 +159,26 @@ membershipRequestRoutes.post(
           404,
         );
       }
+
+      // City-based isolation: the selected community must belong to the selected city
+      if (!community[0].cityId) {
+        return c.json(
+          { error: { code: 'CITY_NOT_CONFIGURED', message: 'Community is not assigned to a city' } },
+          400,
+        );
+      }
+
+      if (community[0].cityId !== cityId) {
+        return c.json(
+          {
+            error: {
+              code: 'CITY_MISMATCH',
+              message: 'Community does not belong to the selected city',
+            },
+          },
+          400,
+        );
+      }
     }
 
     // For CREATE_COMMUNITY, check if slug is available
@@ -146,6 +205,7 @@ membershipRequestRoutes.post(
         requestType,
         communityName: communityName || null,
         communitySlug: communitySlug || null,
+        cityId,
         message: message || null,
       })
       .returning();
@@ -178,7 +238,7 @@ membershipRequestRoutes.get(
       )
       .limit(1)).length > 0;
 
-    let whereConditions = [eq(membershipRequests.status, status)];
+    const whereConditions = [eq(membershipRequests.status, status)];
 
     if (requestType) {
       whereConditions.push(eq(membershipRequests.requestType, requestType));
@@ -283,12 +343,19 @@ membershipRequestRoutes.post(
         );
       }
 
-      // Create the community
+      // Create the community (with its city)
+      const [approvedCity] = request.cityId
+        ? await db.select().from(cities).where(eq(cities.id, request.cityId)).limit(1)
+        : [];
+
       const [community] = await db
         .insert(communities)
         .values({
           name: request.communityName!,
           slug: request.communitySlug!,
+          cityId: approvedCity?.id ?? null,
+          city: approvedCity?.name ?? null,
+          state: approvedCity?.state ?? null,
           status: 'ACTIVE',
         })
         .returning();

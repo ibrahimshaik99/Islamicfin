@@ -9,6 +9,7 @@ import {
   index,
 } from 'drizzle-orm/pg-core';
 import { users } from './users';
+import { cities } from './cities';
 
 export const communityStatusEnum = pgEnum('community_status', [
   'ACTIVE',
@@ -27,6 +28,8 @@ export const communities = pgTable(
     logoUrl: text('logo_url'),
     address: text('address'),
     city: varchar('city', { length: 255 }),
+    // Normalized city reference. City + slug identify the tenant ecosystem.
+    cityId: uuid('city_id').references(() => cities.id, { onDelete: 'set null' }),
     state: varchar('state', { length: 255 }),
     country: varchar('country', { length: 100 }).default('India'),
     contactPhone: varchar('contact_phone', { length: 20 }),
@@ -37,6 +40,12 @@ export const communities = pgTable(
   (table) => ({
     communities_status_idx: index('communities_status_idx').on(table.status),
     communities_created_at_idx: index('communities_created_at_idx').on(table.createdAt),
+    communities_city_id_idx: index('communities_city_id_idx').on(table.cityId),
+    // City + slug uniquely identify the tenant (slug is globally unique; city adds tenant locality)
+    communities_city_slug_idx: uniqueIndex('communities_city_slug_idx').on(
+      table.cityId,
+      table.slug,
+    ),
   }),
 );
 

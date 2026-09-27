@@ -269,9 +269,9 @@ describe('Kameti Integration Tests', () => {
     it('PATCH /api/v1/communities/:id/kameti/groups/:groupId returns 200', async () => {
       const existing = { id: GROUP_ID, communityId: COMMUNITY_A, name: 'Old Name', status: 'ACTIVE' };
       const updated = { ...existing, name: 'New Name' };
-      let callCount = 0;
+      let _callCount = 0;
       mockDb.select.mockImplementation(() => {
-        callCount++;
+        _callCount++;
         return mockSelectChain([existing]);
       });
       mockDb.update.mockReturnValue(mockUpdateChain([updated]));

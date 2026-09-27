@@ -37,6 +37,10 @@ export type Permission =
   | 'payment:verify'
   | 'finance:read'
   | 'finance:manage'
+  | 'bnpl:read'
+  | 'bnpl:create'
+  | 'bnpl:manage'
+  | 'bnpl:review'
   | 'kameti:read'
   | 'kameti:manage'
   | 'messaging:read'
@@ -78,6 +82,10 @@ export const ROLE_PERMISSIONS: Record<string, readonly Permission[]> = {
     'payment:verify',
     'finance:read',
     'finance:manage',
+    'bnpl:read',
+    'bnpl:create',
+    'bnpl:manage',
+    'bnpl:review',
     'kameti:read',
     'kameti:manage',
     'messaging:read',
@@ -118,6 +126,10 @@ export const ROLE_PERMISSIONS: Record<string, readonly Permission[]> = {
     'payment:verify',
     'finance:read',
     'finance:manage',
+    'bnpl:read',
+    'bnpl:create',
+    'bnpl:manage',
+    'bnpl:review',
     'kameti:read',
     'kameti:manage',
     'messaging:read',
@@ -156,6 +168,9 @@ export const ROLE_PERMISSIONS: Record<string, readonly Permission[]> = {
     'payment:report',
     'payment:verify',
     'finance:read',
+    'bnpl:read',
+    'bnpl:manage',
+    'bnpl:review',
     'kameti:read',
     'kameti:manage',
     'messaging:read',
@@ -176,6 +191,7 @@ export const ROLE_PERMISSIONS: Record<string, readonly Permission[]> = {
     'category:read',
     'product:read',
     'order:read',
+    'bnpl:read',
     'messaging:read',
     'messaging:send',
     'service:read',
@@ -187,6 +203,10 @@ export const ROLE_PERMISSIONS: Record<string, readonly Permission[]> = {
     'member:read',
     'finance:read',
     'finance:manage',
+    'bnpl:read',
+    'bnpl:create',
+    'bnpl:manage',
+    'bnpl:review',
     'kameti:read',
     'kameti:manage',
     'order:read',
@@ -211,6 +231,8 @@ export const ROLE_PERMISSIONS: Record<string, readonly Permission[]> = {
     'payment:verify',
     'finance:read',
     'finance:manage',
+    'bnpl:read',
+    'bnpl:create',
     'messaging:read',
     'messaging:send',
     'service:read',
@@ -227,6 +249,7 @@ export const ROLE_PERMISSIONS: Record<string, readonly Permission[]> = {
     'product:read',
     'product:inventory:manage',
     'order:read',
+    'bnpl:read',
     'messaging:read',
     'service:read',
     'service:request:read',
@@ -247,6 +270,8 @@ export const ROLE_PERMISSIONS: Record<string, readonly Permission[]> = {
     'service:request:manage',
     'kameti:read',
     'finance:read',
+    'bnpl:read',
+    'bnpl:create',
   ],
 };
 

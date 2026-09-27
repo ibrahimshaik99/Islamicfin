@@ -19,6 +19,13 @@ export default function MarketplacePage() {
     communityId ? `${prefix}/categories` : null,
   );
 
+  const { data: dash } = useApi<{ community: { name: string; city?: string | null; state?: string | null } }>(
+    communityId ? `${prefix}/dashboard` : null,
+  );
+  const communityLabel = dash?.community
+    ? `${dash.community.name}${dash.community.city ? ` · ${dash.community.city}` : ''}`
+    : null;
+
   const productPath = selectedCategory
     ? `${prefix}/products?categoryId=${selectedCategory}`
     : `${prefix}/products`;
@@ -58,6 +65,9 @@ export default function MarketplacePage() {
                 </svg>
               </button>
               <h1 className="text-lg font-bold">Marketplace</h1>
+              {communityLabel && (
+                <p className="text-xs text-white/70 -mt-0.5">{communityLabel}</p>
+              )}
             </div>
             <Link to="/app/cart" className="relative touch-target flex items-center justify-center">
               <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">

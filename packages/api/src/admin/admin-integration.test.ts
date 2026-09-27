@@ -10,6 +10,9 @@ const { mockDb, lastQueryResult, mockGetSessionUser, mockSelectChain } = vi.hois
       limit: vi.fn().mockReturnThis(),
       orderBy: vi.fn().mockReturnThis(),
       offset: vi.fn().mockReturnThis(),
+      groupBy: vi.fn().mockReturnThis(),
+      innerJoin: vi.fn().mockReturnThis(),
+      leftJoin: vi.fn().mockReturnThis(),
       returning: vi.fn().mockResolvedValue([]),
       then: (resolve: (v: unknown) => void) => resolve(lastQueryResult.value),
     };

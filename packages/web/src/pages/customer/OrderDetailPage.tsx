@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useApi, useMutation } from '../../lib/useApi';
 import { LoadingState, ErrorState } from '../../components/ui';
 import type { Order, OrderItem, OrderStatus } from '../../lib/types';
+import { BnplContract, BnplFrequency, BNPL_STATUS_COLORS, formatMoney, toDateInputDefault } from '../../lib/bnpl';
 
 const TIMELINE_STEPS: { status: OrderStatus; label: string; icon: string }[] = [
   { status: 'PENDING', label: 'Order Placed', icon: '📋' },
@@ -37,6 +38,20 @@ export default function OrderDetailPage() {
   const { data, loading, error, refetch } = useApi<Order & { items: OrderItem[] }>(
     communityId && orderId ? `${prefix}/orders/${orderId}` : null,
   );
+
+  // Existing deferred-payment contract for this order (if any)
+  const { data: bnplContracts, refetch: refetchBnpl } = useApi<BnplContract[]>(
+    communityId && orderId ? `${prefix}/bnpl/contracts?orderId=${orderId}&limit=1` : null,
+  );
+  const existingPlan = bnplContracts && bnplContracts.length > 0 ? bnplContracts[0] : null;
+
+  const [showBnplModal, setShowBnplModal] = useState(false);
+  const [bnplDown, setBnplDown] = useState('0');
+  const [bnplCount, setBnplCount] = useState(3);
+  const [bnplFrequency, setBnplFrequency] = useState<BnplFrequency>('MONTHLY');
+  const [bnplFirstDue, setBnplFirstDue] = useState(toDateInputDefault(7));
+  const [bnplSubmitting, setBnplSubmitting] = useState(false);
+  const [bnplError, setBnplError] = useState('');
 
   const order = data;
 
@@ -100,6 +115,39 @@ export default function OrderDetailPage() {
   const isPaid = order?.paymentStatus === 'PAYMENT_VERIFIED';
   const isReported = order?.paymentStatus === 'PAYMENT_REPORTED';
   const isRejected = order?.paymentStatus === 'PAYMENT_REJECTED';
+  const canRequestPlan =
+    order &&
+    !existingPlan &&
+    order.paymentStatus !== 'PAYMENT_VERIFIED' &&
+    order.orderStatus !== 'CANCELLED' &&
+    order.orderStatus !== 'REJECTED';
+
+  const handleRequestPlan = async () => {
+    if (!orderId) return;
+    setBnplSubmitting(true);
+    setBnplError('');
+    try {
+      const result = await mutate(`${prefix}/bnpl/contracts`, {
+        method: 'POST',
+        body: {
+          orderId,
+          downPayment: bnplDown.trim() || '0',
+          installmentCount: bnplCount,
+          installmentFrequency: bnplFrequency,
+          firstDueDate: bnplFirstDue,
+        },
+      });
+      if (result === null) {
+        setBnplError('Could not request the plan. Please check your inputs and try again.');
+        return;
+      }
+      setShowBnplModal(false);
+      flash('Installment plan requested — awaiting community & Shariah review.');
+      refetchBnpl();
+    } finally {
+      setBnplSubmitting(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-slate-50">
@@ -221,6 +269,59 @@ export default function OrderDetailPage() {
               <button onClick={() => setShowPaymentModal(true)} className="mt-3 w-full py-3 text-sm font-bold text-white bg-gradient-to-r from-blue-500 to-indigo-500 rounded-xl hover:from-blue-600 hover:to-indigo-600 active:scale-[0.98] transition-all shadow-lg shadow-blue-200">
                 Mark Payment (UPI / Cash)
               </button>
+            )}
+          </div>
+
+          {/* Deferred Payment Plan (Shariah-reviewed) */}
+          <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm animate-in fade-in slide-in-from-bottom-4 delay-150">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-bold text-gray-900">Deferred Payment Plan</h3>
+              {existingPlan && (
+                <span className={`text-xs px-2 py-1 rounded-full font-semibold ${BNPL_STATUS_COLORS[existingPlan.status] || 'bg-gray-100 text-gray-700'}`}>
+                  {existingPlan.status.replace(/_/g, ' ')}
+                </span>
+              )}
+            </div>
+            {!existingPlan && canRequestPlan && (
+              <>
+                <p className="text-xs text-gray-500 leading-relaxed mb-3">
+                  Split this order into fixed installments — a deferred sale at a fixed total price.
+                  No interest, compounding, or late fees. The plan starts only after community & Shariah review.
+                </p>
+                <button
+                  onClick={() => { setBnplError(''); setShowBnplModal(true); }}
+                  className="w-full py-3 text-sm font-bold text-teal-700 bg-teal-50 rounded-xl hover:bg-teal-100 transition-colors"
+                >
+                  Request Installment Plan
+                </button>
+              </>
+            )}
+            {!existingPlan && !canRequestPlan && order.paymentStatus === 'PAYMENT_VERIFIED' && (
+              <p className="text-xs text-gray-500">This order is already paid in full.</p>
+            )}
+            {existingPlan && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-500">Plan</span>
+                  <span className="font-medium text-gray-900">
+                    {existingPlan.installmentCount} × {formatMoney(existingPlan.installmentAmount)} ({existingPlan.installmentFrequency.toLowerCase()})
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-500">Shariah review</span>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
+                    existingPlan.shariahReviewStatus === 'REVIEWED' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                  }`}>
+                    {existingPlan.shariahReviewStatus.replace(/_/g, ' ')}
+                  </span>
+                </div>
+                <button
+                  onClick={() => navigate(`/app/bnpl/${existingPlan.id}`)}
+                  className="w-full py-2.5 text-xs font-bold text-teal-700 bg-teal-50 rounded-xl hover:bg-teal-100 transition-colors"
+                >
+                  View Schedule & Payments →
+                </button>
+              </div>
             )}
           </div>
 
@@ -382,6 +483,85 @@ export default function OrderDetailPage() {
               className="w-full py-3 text-sm font-bold text-white bg-amber-600 rounded-xl hover:bg-amber-700 transition-colors"
             >
               Submit Return Request
+            </button>
+          </div>
+        </div>
+      )}
+      {/* Installment Plan Request Modal */}
+      {showBnplModal && order && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center" onClick={() => setShowBnplModal(false)}>
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" />
+          <div
+            className="relative bg-white rounded-t-3xl sm:rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in slide-in-from-bottom-4 max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-bold text-gray-900">Request Installment Plan</h3>
+              <button onClick={() => setShowBnplModal(false)} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors">
+                <svg className="h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="space-y-3 mb-4">
+              <div className="bg-gray-50 rounded-xl p-3 text-xs text-gray-600">
+                Order total: <span className="font-bold text-gray-900">₹{order.total}</span>
+                {' · '}fixed price, no interest or late fees. Plan requires community & Shariah review before activation.
+              </div>
+              {bnplError && <p className="text-sm text-red-600">{bnplError}</p>}
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Down Payment (₹)</label>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={bnplDown}
+                  onChange={(e) => setBnplDown(e.target.value.replace(/[^0-9.]/g, ''))}
+                  className="w-full px-4 py-3 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Installments</label>
+                  <select
+                    value={bnplCount}
+                    onChange={(e) => setBnplCount(Number(e.target.value))}
+                    className="w-full px-3 py-3 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none bg-white"
+                  >
+                    {Array.from({ length: 23 }, (_, i) => i + 2).map((n) => (
+                      <option key={n} value={n}>{n}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Frequency</label>
+                  <select
+                    value={bnplFrequency}
+                    onChange={(e) => setBnplFrequency(e.target.value as BnplFrequency)}
+                    className="w-full px-3 py-3 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none bg-white"
+                  >
+                    <option value="WEEKLY">Weekly</option>
+                    <option value="BIWEEKLY">Every 2 weeks</option>
+                    <option value="MONTHLY">Monthly</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">First Due Date</label>
+                <input
+                  type="date"
+                  value={bnplFirstDue}
+                  min={new Date().toISOString().slice(0, 10)}
+                  onChange={(e) => setBnplFirstDue(e.target.value)}
+                  className="w-full px-4 py-3 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
+                />
+              </div>
+            </div>
+            <button
+              onClick={handleRequestPlan}
+              disabled={bnplSubmitting || !bnplFirstDue}
+              className="w-full py-3 text-sm font-bold text-white bg-teal-600 rounded-xl hover:bg-teal-700 disabled:opacity-50 transition-colors"
+            >
+              {bnplSubmitting ? 'Submitting...' : 'Request Plan for Review'}
             </button>
           </div>
         </div>

@@ -3,7 +3,7 @@ import { eq, and, desc, count, ilike } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../db';
 import { communityDirectory, contractTemplates } from '../db/schema/community-directory';
-import { communities, communityMemberships, users } from '../db/schema';
+import { communities, communityMemberships } from '../db/schema';
 import { requireAuth } from '../auth/middleware';
 import { tenantMiddleware } from '../tenancy/middleware';
 import { requirePermission } from '../rbac/middleware';

@@ -85,7 +85,7 @@ export default function PhoneLoginPage() {
           </p>
         </div>
 
-        <form className="mt-8 space-y-5 bg-white p-8 rounded-xl shadow-sm border border-gray-100" onSubmit={(e) => { e.preventDefault(); step === 'phone' ? handleSendOTP() : handleVerifyOTP(); }}>
+        <form className="mt-8 space-y-5 bg-white p-8 rounded-xl shadow-sm border border-gray-100" onSubmit={(e) => { e.preventDefault(); if (step === 'phone') { handleSendOTP(); } else { handleVerifyOTP(); } }}>
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm flex items-start gap-2">
               <svg className="h-5 w-5 text-red-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">

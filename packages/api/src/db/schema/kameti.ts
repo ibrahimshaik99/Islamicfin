@@ -135,6 +135,7 @@ export const kametiContributions = pgTable(
     referenceNumber: varchar('reference_number', { length: 255 }),
     proofUrl: text('proof_url'),
     status: kametiContributionStatusEnum('status').notNull().default('PENDING'),
+    paidAt: timestamp('paid_at', { withTimezone: true }),
     verifiedBy: uuid('verified_by').references(() => users.id, {
       onDelete: 'set null',
     }),

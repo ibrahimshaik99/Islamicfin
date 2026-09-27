@@ -8,6 +8,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { users } from './users';
 import { communities } from './communities';
+import { cities } from './cities';
 
 export const membershipRequests = pgTable(
   'membership_requests',
@@ -22,6 +23,8 @@ export const membershipRequests = pgTable(
     status: varchar('status', { length: 50 }).notNull().default('PENDING'),
     communityName: varchar('community_name', { length: 255 }),
     communitySlug: varchar('community_slug', { length: 255 }),
+    // City chosen at onboarding (CREATE_COMMUNITY) — server-validated against cities table
+    cityId: uuid('city_id').references(() => cities.id, { onDelete: 'set null' }),
     message: text('message'),
     reviewedBy: uuid('reviewed_by').references(() => users.id),
     reviewedAt: timestamp('reviewed_at', { withTimezone: true }),

@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { and, eq, count, desc } from 'drizzle-orm';
 import { db } from '../db';
 import { orderReturns } from '../db/schema/order-returns';
-import { orders, orderItems } from '../db/schema/orders';
+import { orders } from '../db/schema/orders';
 import { merchants } from '../db/schema/merchants';
 import { users } from '../db/schema/users';
 import { auditLogs } from '../db/schema/audit';
@@ -129,7 +129,7 @@ returnRoutes.get(
     const conditions = [eq(orderReturns.communityId, communityId)];
 
     // If merchant, only show returns for their orders
-    if (c.get('role') === 'MERCHANT' || c.get('role') === 'MERCHANT_STAFF') {
+    if (tenant.role === 'MERCHANT' || tenant.role === 'MERCHANT_STAFF') {
       const [merchant] = await db
         .select()
         .from(merchants)
@@ -141,7 +141,7 @@ returnRoutes.get(
     }
 
     // If customer, only show their own returns
-    if (c.get('role') === 'CUSTOMER') {
+    if (tenant.role === 'CUSTOMER') {
       conditions.push(eq(orderReturns.customerId, user.id));
     }
 

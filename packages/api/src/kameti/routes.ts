@@ -88,8 +88,8 @@ kametiRoutes.post(
         periodEnd.setMonth(periodEnd.getMonth() + 1);
       } else if (result.data.frequency === 'WEEKLY') {
         periodEnd.setDate(periodEnd.getDate() + 7);
-      } else if (result.data.frequency === 'QUARTERLY') {
-        periodEnd.setMonth(periodEnd.getMonth() + 3);
+      } else if (result.data.frequency === 'BIWEEKLY') {
+        periodEnd.setDate(periodEnd.getDate() + 14);
       }
       periodsToCreate.push({
         kametiGroupId: group.id,
@@ -97,7 +97,7 @@ kametiRoutes.post(
         periodStart: periodStart.toISOString().split('T')[0],
         periodEnd: periodEnd.toISOString().split('T')[0],
         dueDate: periodEnd.toISOString().split('T')[0],
-        status: i === 0 ? 'ACTIVE' : 'PENDING',
+        status: i === 0 ? ('ACTIVE' as const) : ('PENDING' as const),
       });
     }
     if (periodsToCreate.length > 0) {

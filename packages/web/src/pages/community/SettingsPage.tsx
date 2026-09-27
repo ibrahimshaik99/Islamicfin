@@ -6,11 +6,18 @@ import { useApi, useMutation } from '../../lib/useApi';
 import { LoadingState, ErrorState, Button, Input, Card, CardContent } from '../../components/ui';
 import type { Community } from '../../lib/types';
 
+interface CityOption {
+  id: string;
+  name: string;
+  state: string;
+}
+
 export default function SettingsPage() {
   const { communityId } = useAuth();
   const prefix = communityId ? `/communities/${communityId}` : '';
 
   const { data, loading, error, refetch } = useApi<{ community: Community; stats: Record<string, number> }>(communityId ? `${prefix}/dashboard` : null);
+  const { data: cities } = useApi<CityOption[]>('/cities');
   const { mutate, loading: mutating } = useMutation();
 
   const community = data?.community;
@@ -19,8 +26,7 @@ export default function SettingsPage() {
     name: '',
     description: '',
     address: '',
-    city: '',
-    state: '',
+    cityId: '',
     country: '',
     contactPhone: '',
   });
@@ -31,8 +37,7 @@ export default function SettingsPage() {
         name: community.name || '',
         description: community.description || '',
         address: community.address || '',
-        city: community.city || '',
-        state: community.state || '',
+        cityId: '',
         country: community.country || '',
         contactPhone: community.contactPhone || '',
       });
@@ -40,7 +45,9 @@ export default function SettingsPage() {
   }, [community]);
 
   const handleSave = async () => {
-    await mutate(`${prefix}/settings`, { method: 'PATCH', body: form });
+    const body: Record<string, unknown> = { ...form };
+    if (!body.cityId) delete body.cityId;
+    await mutate(`${prefix}/settings`, { method: 'PATCH', body });
     refetch();
   };
 
@@ -66,9 +73,23 @@ export default function SettingsPage() {
                   />
                 </div>
                 <Input label="Address" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
-                <div className="grid grid-cols-2 gap-4">
-                  <Input label="City" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
-                  <Input label="State" value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })} />
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
+                  <select
+                    value={form.cityId}
+                    onChange={(e) => setForm({ ...form, cityId: e.target.value })}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none bg-white"
+                  >
+                    <option value="">
+                      {community?.city ? `Current: ${community.city}${community.state ? `, ${community.state}` : ''} (keep)` : 'Select a city...'}
+                    </option>
+                    {(cities || []).map((city) => (
+                      <option key={city.id} value={city.id}>{city.name}, {city.state}</option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    The community's city determines which city's marketplace and onboarding it appears in.
+                  </p>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <Input label="Country" value={form.country} onChange={(e) => setForm({ ...form, country: e.target.value })} />

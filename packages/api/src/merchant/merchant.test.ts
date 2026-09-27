@@ -159,6 +159,7 @@ describe('Merchant Onboarding Integration Tests', () => {
         }),
       });
       mockDb.insert.mockReturnValue(mockInsertChain([{ id: MERCHANT_ID, businessName: 'Test Shop' }]));
+      mockDb.update.mockReturnValue(mockUpdateChain([{ id: USER_A, role: 'MERCHANT' }]));
 
       const res = await app.request(
         `http://localhost/api/v1/communities/${COMMUNITY_A}/merchants/apply`,

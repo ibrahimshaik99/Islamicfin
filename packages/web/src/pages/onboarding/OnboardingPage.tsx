@@ -12,6 +12,13 @@ interface Community {
   status: string;
 }
 
+interface CityOption {
+  id: string;
+  name: string;
+  state: string;
+  activeCommunityCount: number;
+}
+
 interface MembershipRequest {
   id: string;
   requestType: string;
@@ -26,7 +33,10 @@ export default function OnboardingPage() {
   const navigate = useNavigate();
   const { memberships, loadSession } = useAuth();
   const [tab, setTab] = useState<'join' | 'create'>('join');
+  const [cities, setCities] = useState<CityOption[]>([]);
+  const [selectedCity, setSelectedCity] = useState('');
   const [communities, setCommunities] = useState<Community[]>([]);
+  const [communitiesLoading, setCommunitiesLoading] = useState(false);
   const [myRequests, setMyRequests] = useState<MembershipRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -52,11 +62,11 @@ export default function OnboardingPage() {
 
   const loadData = async () => {
     try {
-      const [commRes, reqRes] = await Promise.all([
-        api<{ data: Community[] }>('/membership-requests/communities', { signal: AbortSignal.timeout(10000) }).catch(() => ({ data: [] })),
+      const [cityRes, reqRes] = await Promise.all([
+        api<{ data: CityOption[] }>('/cities', { signal: AbortSignal.timeout(10000) }).catch(() => ({ data: [] })),
         api<{ data: MembershipRequest[] }>('/membership-requests/my', { signal: AbortSignal.timeout(10000) }).catch(() => ({ data: [] })),
       ]);
-      setCommunities(commRes.data || []);
+      setCities(cityRes.data || []);
       setMyRequests(reqRes.data || []);
     } catch {
       // ignore
@@ -65,8 +75,35 @@ export default function OnboardingPage() {
     }
   };
 
+  useEffect(() => {
+    if (!selectedCity) {
+      setCommunities([]);
+      setSelectedCommunity('');
+      return;
+    }
+    let cancelled = false;
+    setCommunitiesLoading(true);
+    setCommunities([]);
+    setSelectedCommunity('');
+    api<{ data: { communities: Community[] } }>(`/cities/${selectedCity}/communities`, {
+      signal: AbortSignal.timeout(10000),
+    })
+      .then((res) => {
+        if (!cancelled) setCommunities(res.data?.communities || []);
+      })
+      .catch(() => {
+        if (!cancelled) setCommunities([]);
+      })
+      .finally(() => {
+        if (!cancelled) setCommunitiesLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedCity]);
+
   const handleJoin = async () => {
-    if (!selectedCommunity) return;
+    if (!selectedCommunity || !selectedCity) return;
     setSubmitting(true);
     setError('');
     setSuccess('');
@@ -76,6 +113,7 @@ export default function OnboardingPage() {
         body: {
           requestType: 'JOIN_COMMUNITY',
           communityId: selectedCommunity,
+          cityId: selectedCity,
           message: joinMessage || undefined,
         },
       });
@@ -85,15 +123,15 @@ export default function OnboardingPage() {
       // Reload session in case request was auto-approved
       await loadSession();
       loadData();
-    } catch (err: any) {
-      setError(err.message || 'Failed to send request');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to send request');
     } finally {
       setSubmitting(false);
     }
   };
 
   const handleCreate = async () => {
-    if (!newName.trim() || !newSlug.trim()) return;
+    if (!newName.trim() || !newSlug.trim() || !selectedCity) return;
     setSubmitting(true);
     setError('');
     setSuccess('');
@@ -104,6 +142,7 @@ export default function OnboardingPage() {
           requestType: 'CREATE_COMMUNITY',
           communityName: newName.trim(),
           communitySlug: newSlug.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-'),
+          cityId: selectedCity,
           message: newMessage || undefined,
         },
       });
@@ -114,8 +153,8 @@ export default function OnboardingPage() {
       // Reload session in case request was auto-approved
       await loadSession();
       loadData();
-    } catch (err: any) {
-      setError(err.message || 'Failed to send request');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to send request');
     } finally {
       setSubmitting(false);
     }
@@ -147,8 +186,30 @@ export default function OnboardingPage() {
             </svg>
           </div>
           <h1 className="text-2xl font-bold text-gray-900">Welcome to Islamic Community Platform</h1>
-          <p className="text-sm text-gray-500 mt-2">Join an existing community or create your own</p>
+          <p className="text-sm text-gray-500 mt-2">Choose your city, then join an existing community or create your own</p>
         </div>
+
+        {/* City selection — required before join/create */}
+        <Card className="mb-6">
+          <CardContent>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Your City</label>
+            <select
+              value={selectedCity}
+              onChange={(e) => setSelectedCity(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+            >
+              <option value="">Choose your city...</option>
+              {cities.map((city) => (
+                <option key={city.id} value={city.id}>
+                  {city.name}, {city.state} ({city.activeCommunityCount} {city.activeCommunityCount === 1 ? 'community' : 'communities'})
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-500 mt-2">
+              Communities are city-based. You can only join or create communities in your selected city.
+            </p>
+          </CardContent>
+        </Card>
 
         {/* My Requests */}
         {myRequests.length > 0 && (
@@ -187,7 +248,7 @@ export default function OnboardingPage() {
         )}
 
         {/* Tabs */}
-        <div className="flex gap-2 mb-6">
+        <div className={`flex gap-2 mb-6 ${selectedCity ? '' : 'opacity-50 pointer-events-none'}`}>
           <button
             onClick={() => setTab('join')}
             className={`flex-1 py-3 px-4 rounded-xl text-sm font-medium transition-all ${
@@ -220,22 +281,32 @@ export default function OnboardingPage() {
 
         {/* Join Community */}
         {tab === 'join' && (
-          <Card>
+          <Card className={selectedCity ? '' : 'opacity-50 pointer-events-none'}>
             <CardContent>
               <h3 className="text-sm font-semibold text-gray-900 mb-4">Request to Join a Community</h3>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Select Community</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Select Community {selectedCity ? '' : '(choose your city first)'}
+                  </label>
                   <select
                     value={selectedCommunity}
                     onChange={(e) => setSelectedCommunity(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                    disabled={!selectedCity || communitiesLoading}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 disabled:bg-gray-50 disabled:text-gray-400"
                   >
-                    <option value="">Choose a community...</option>
+                    <option value="">
+                      {communitiesLoading ? 'Loading communities...' : 'Choose a community...'}
+                    </option>
                     {communities.filter((c) => c.status === 'ACTIVE').map((c) => (
                       <option key={c.id} value={c.id}>{c.name}</option>
                     ))}
                   </select>
+                  {selectedCity && !communitiesLoading && communities.length === 0 && (
+                    <p className="text-xs text-amber-600 mt-1">
+                      No active communities in this city yet. You can create the first one.
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Message (optional)</label>
@@ -249,7 +320,7 @@ export default function OnboardingPage() {
                 </div>
                 <Button
                   onClick={handleJoin}
-                  disabled={!selectedCommunity || submitting}
+                  disabled={!selectedCity || !selectedCommunity || submitting}
                   className="w-full"
                 >
                   {submitting ? 'Sending...' : 'Send Request'}
@@ -261,7 +332,7 @@ export default function OnboardingPage() {
 
         {/* Create Community */}
         {tab === 'create' && (
-          <Card>
+          <Card className={selectedCity ? '' : 'opacity-50 pointer-events-none'}>
             <CardContent>
               <h3 className="text-sm font-semibold text-gray-900 mb-4">Request to Create a Community</h3>
               <div className="space-y-4">
@@ -299,7 +370,7 @@ export default function OnboardingPage() {
                 </div>
                 <Button
                   onClick={handleCreate}
-                  disabled={!newName.trim() || !newSlug.trim() || submitting}
+                  disabled={!selectedCity || !newName.trim() || !newSlug.trim() || submitting}
                   className="w-full"
                 >
                   {submitting ? 'Sending...' : 'Request Community Creation'}

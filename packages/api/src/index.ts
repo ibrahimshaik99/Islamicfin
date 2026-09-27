@@ -17,6 +17,8 @@ import financeRoutes from './finance/routes';
 import financeRequestRoutes from './finance/finance-request-routes';
 import directoryRoutes from './community/directory-routes';
 import { superAdminDirectoryRoutes } from './community/directory-routes';
+import bnplRoutes from './bnpl/routes';
+import { cityRoutes, superAdminCityRoutes } from './cities/routes';
 import adminRoutes from './admin/routes';
 import returnRoutes from './orders/return-routes';
 import membershipRequestRoutes from './membership-requests/routes';
@@ -111,6 +113,15 @@ app.route('/api/v1/admin', adminRoutes);
 
 // Super admin directory and contracts
 app.route('/api/v1/admin', superAdminDirectoryRoutes);
+
+// Super admin city management
+app.route('/api/v1/admin', superAdminCityRoutes);
+
+// Public city + community discovery (city-based tenant selection)
+app.route('/api/v1', cityRoutes);
+
+// BNPL / deferred-payment contracts (tenant-scoped)
+app.route('/api/v1/communities', bnplRoutes);
 
 // Membership request routes (join/create community)
 app.route('/api/v1/membership-requests', membershipRequestRoutes);

@@ -33,6 +33,7 @@ import AdminApprovalsPage from './pages/admin/ApprovalsPage';
 import AdminOrdersPage from './pages/admin/OrdersPage';
 import AdminFinanceRequestsPage from './pages/FinanceRequestPage';
 import AdminDirectoryPage from './pages/admin/DirectoryPage';
+import CitiesPage from './pages/admin/CitiesPage';
 
 import CommunityMembersPage from './pages/community/MembersPage';
 import CommunityGroupsPage from './pages/community/GroupsPage';
@@ -55,6 +56,7 @@ import CommunityApprovalsPage from './pages/community/ApprovalsPage';
 import CommunityFinanceRequestsPage from './pages/community/FinanceRequestsPage';
 import CommunityDirectoryPage from './pages/community/DirectoryPage';
 import CommunityContractsPage from './pages/community/ContractsPage';
+import CommunityBnplPage from './pages/community/BnplPage';
 
 import MerchantProductsPage from './pages/merchant/ProductsPage';
 import MerchantCategoriesPage from './pages/merchant/CategoriesPage';
@@ -69,6 +71,7 @@ import MerchantMessagesPage from './pages/merchant/MerchantMessagesPage';
 import MerchantApplyPage from './pages/merchant/MerchantApplyPage';
 import MerchantOrderReturnsPage from './pages/merchant/OrderReturnsPage';
 import MerchantFinanceRequestsPage from './pages/merchant/MerchantFinanceRequestsPage';
+import MerchantBnplPage from './pages/merchant/BnplPage';
 
 import { CustomerShell } from './pages/customer/CustomerShell';
 import CustomerHome from './pages/customer/CustomerHome';
@@ -91,6 +94,8 @@ import FinanceRequestPage from './pages/customer/FinanceRequestPage';
 import CustomerProfilePage from './pages/customer/CustomerProfilePage';
 import CustomerMorePage from './pages/customer/CustomerMorePage';
 import CustomerFinanceRequestsPage from './pages/customer/CustomerFinanceRequestsPage';
+import BnplPage from './pages/customer/BnplPage';
+import BnplDetailPage from './pages/customer/BnplDetailPage';
 
 function App() {
   return (
@@ -138,6 +143,7 @@ function App() {
               <Route path="/admin/orders" element={<ProtectedRoute><AdminOrdersPage /></ProtectedRoute>} />
               <Route path="/admin/finance-requests" element={<ProtectedRoute><AdminFinanceRequestsPage navItems={adminNav} navTitle="Super Admin" title="Finance Requests" canCreate={false} canManage={true} apiPath="/admin/finance-requests" /></ProtectedRoute>} />
               <Route path="/admin/directory" element={<ProtectedRoute><AdminDirectoryPage /></ProtectedRoute>} />
+              <Route path="/admin/cities" element={<ProtectedRoute><CitiesPage /></ProtectedRoute>} />
 
               {/* Community routes */}
               <Route path="/community" element={<ProtectedRoute><CommunityGuard><CommunityDashboard /></CommunityGuard></ProtectedRoute>} />
@@ -162,6 +168,7 @@ function App() {
               <Route path="/community/finance-requests" element={<ProtectedRoute><CommunityGuard><CommunityFinanceRequestsPage /></CommunityGuard></ProtectedRoute>} />
               <Route path="/community/directory" element={<ProtectedRoute><CommunityGuard><CommunityDirectoryPage /></CommunityGuard></ProtectedRoute>} />
               <Route path="/community/contracts" element={<ProtectedRoute><CommunityGuard><CommunityContractsPage /></CommunityGuard></ProtectedRoute>} />
+              <Route path="/community/bnpl" element={<ProtectedRoute><CommunityGuard><CommunityBnplPage /></CommunityGuard></ProtectedRoute>} />
 
               {/* Merchant routes */}
               <Route path="/merchant" element={<ProtectedRoute><MerchantDashboard /></ProtectedRoute>} />
@@ -178,6 +185,7 @@ function App() {
               <Route path="/merchant/settings" element={<ProtectedRoute><MerchantSettingsPage /></ProtectedRoute>} />
               <Route path="/merchant/returns" element={<ProtectedRoute><MerchantOrderReturnsPage /></ProtectedRoute>} />
               <Route path="/merchant/finance-requests" element={<ProtectedRoute><MerchantFinanceRequestsPage /></ProtectedRoute>} />
+              <Route path="/merchant/bnpl" element={<ProtectedRoute><MerchantBnplPage /></ProtectedRoute>} />
 
               {/* Customer mobile-first routes (/app) */}
               <Route path="/app" element={<ProtectedRoute><CustomerShell><CustomerHome /></CustomerShell></ProtectedRoute>} />
@@ -187,6 +195,8 @@ function App() {
               <Route path="/app/checkout" element={<ProtectedRoute><CheckoutPage /></ProtectedRoute>} />
               <Route path="/app/orders" element={<ProtectedRoute><CustomerShell><OrdersPage /></CustomerShell></ProtectedRoute>} />
               <Route path="/app/orders/:orderId" element={<ProtectedRoute><OrderDetailPage /></ProtectedRoute>} />
+              <Route path="/app/bnpl" element={<ProtectedRoute><CustomerShell><BnplPage /></CustomerShell></ProtectedRoute>} />
+              <Route path="/app/bnpl/:contractId" element={<ProtectedRoute><BnplDetailPage /></ProtectedRoute>} />
               <Route path="/app/kameti" element={<ProtectedRoute><CustomerShell><CustomerKametiPage /></CustomerShell></ProtectedRoute>} />
               <Route path="/app/kameti/:groupId" element={<ProtectedRoute><CustomerKametiDetailPage /></ProtectedRoute>} />
               <Route path="/app/kameti/:groupId/chat" element={<ProtectedRoute><CustomerKametiGroupChatPage /></ProtectedRoute>} />

@@ -14,6 +14,7 @@ import {
   crowdfundingProjects,
   kametiGroups,
   riskFlags,
+  cities,
 } from '../db/schema';
 import { financeRequests } from '../db/schema/finance-requests';
 import { requireSuperAdmin } from './middleware';
@@ -155,6 +156,8 @@ adminRoutes.get('/communities', async (c) => {
       name: communities.name,
       slug: communities.slug,
       status: communities.status,
+      city: communities.city,
+      state: communities.state,
       createdAt: communities.createdAt,
     })
     .from(communities)
@@ -232,6 +235,7 @@ const createCommunitySchema = z.object({
   name: z.string().min(1).max(255),
   slug: z.string().min(1).max(255).regex(/^[a-z0-9-]+$/, 'Slug must be lowercase alphanumeric with hyphens'),
   description: z.string().max(1000).optional(),
+  cityId: z.string().uuid(),
 });
 
 adminRoutes.post('/communities', async (c) => {
@@ -241,6 +245,19 @@ adminRoutes.post('/communities', async (c) => {
   if (!result.success) {
     return c.json(
       { error: { code: 'VALIDATION_ERROR', message: result.error.errors[0].message } },
+      422,
+    );
+  }
+
+  const [city] = await db
+    .select()
+    .from(cities)
+    .where(eq(cities.id, result.data.cityId))
+    .limit(1);
+
+  if (!city || city.status !== 'ACTIVE') {
+    return c.json(
+      { error: { code: 'VALIDATION_ERROR', message: 'Selected city is not available.' } },
       422,
     );
   }
@@ -264,9 +281,12 @@ adminRoutes.post('/communities', async (c) => {
       name: result.data.name,
       slug: result.data.slug,
       description: result.data.description,
+      cityId: city.id,
+      city: city.name,
+      state: city.state,
       status: 'PENDING',
     })
-    .returning({ id: communities.id, name: communities.name, slug: communities.slug, status: communities.status });
+    .returning({ id: communities.id, name: communities.name, slug: communities.slug, status: communities.status, cityId: communities.cityId });
 
   await db.insert(auditLogs).values({
     actorId: c.get('user')!.id,
@@ -1352,7 +1372,7 @@ adminRoutes.get('/users/:userId', async (c) => {
 
   // Get order stats
   const [{ value: totalOrders }] = await db
-    .select({ count: count() })
+    .select({ value: count() })
     .from(orders)
     .where(eq(orders.customerId, userId));
 
