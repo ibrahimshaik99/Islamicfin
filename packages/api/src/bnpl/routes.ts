@@ -12,6 +12,7 @@ import { auditLogs } from '../db/schema/audit';
 import { requireAuth } from '../auth/middleware';
 import { tenantMiddleware } from '../tenancy/middleware';
 import { requirePermission } from '../rbac/middleware';
+import { createNotification } from '../notifications/routes';
 
 const bnplRoutes = new Hono();
 
@@ -552,6 +553,15 @@ bnplRoutes.post(
         newValues: { status: 'CANCELLED', comments },
       });
 
+      await createNotification({
+        userId: contract.customerId,
+        communityId: tenant.communityId,
+        type: 'BNPL_CONTRACT_REVIEWED',
+        title: 'Installment plan decision',
+        body: 'Your deferred payment request was not approved. Contact your community for details.',
+        data: { contractId: contract.id, status: 'CANCELLED' },
+      });
+
       return c.json({ data: updated });
     }
 
@@ -590,6 +600,21 @@ bnplRoutes.post(
         shariahReviewStatus: updated.shariahReviewStatus,
         comments,
       },
+    });
+
+    await createNotification({
+      userId: contract.customerId,
+      communityId: tenant.communityId,
+      type: 'BNPL_CONTRACT_REVIEWED',
+      title:
+        updated.status === 'ACTIVE'
+          ? 'Installment plan approved'
+          : 'Installment plan under review',
+      body:
+        updated.status === 'ACTIVE'
+          ? 'Your deferred payment plan was approved and is now active.'
+          : 'Your deferred payment request is being reviewed by your community.',
+      data: { contractId: contract.id, status: updated.status },
     });
 
     return c.json({ data: updated });

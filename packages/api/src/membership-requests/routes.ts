@@ -6,6 +6,7 @@ import { membershipRequests } from '../db/schema/membership-requests';
 import { communityMemberships, communities } from '../db/schema/communities';
 import { cities } from '../db/schema/cities';
 import { requireAuth } from '../auth/middleware';
+import { createNotification } from '../notifications/routes';
 
 const membershipRequestRoutes = new Hono();
 
@@ -428,6 +429,15 @@ membershipRequestRoutes.post(
       .where(eq(membershipRequests.id, requestId))
       .returning();
 
+    await createNotification({
+      userId: request.userId,
+      communityId: request.communityId,
+      type: 'MEMBERSHIP_REQUEST_DECISION',
+      title: 'Join request approved',
+      body: 'Your request to join the community was approved. The community is now available in your app.',
+      data: { requestId, status: 'APPROVED' },
+    });
+
     return c.json({ data: updated });
   },
 );
@@ -526,6 +536,17 @@ membershipRequestRoutes.post(
       })
       .where(eq(membershipRequests.id, requestId))
       .returning();
+
+    await createNotification({
+      userId: request.userId,
+      communityId: request.communityId,
+      type: 'MEMBERSHIP_REQUEST_DECISION',
+      title: 'Join request update',
+      body: result.data.reason
+        ? `Your request was not approved: ${result.data.reason}`
+        : 'Your request to join the community was not approved.',
+      data: { requestId, status: 'REJECTED' },
+    });
 
     return c.json({ data: updated });
   },

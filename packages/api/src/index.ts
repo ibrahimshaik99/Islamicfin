@@ -22,6 +22,7 @@ import { cityRoutes, superAdminCityRoutes } from './cities/routes';
 import adminRoutes from './admin/routes';
 import returnRoutes from './orders/return-routes';
 import membershipRequestRoutes from './membership-requests/routes';
+import notificationRoutes from './notifications/routes';
 import { authMiddleware } from './auth/middleware';
 
 type Bindings = {
@@ -125,6 +126,9 @@ app.route('/api/v1/communities', bnplRoutes);
 
 // Membership request routes (join/create community)
 app.route('/api/v1/membership-requests', membershipRequestRoutes);
+
+// User notifications (user-scoped, not tenant-scoped)
+app.route('/api/v1', notificationRoutes);
 
 // 404 handler
 app.notFound((c) => {

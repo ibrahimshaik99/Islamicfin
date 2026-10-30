@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { and, eq, count, desc, sql, inArray } from 'drizzle-orm';
+import { and, eq, count, desc, gt, sql, inArray } from 'drizzle-orm';
 import { db } from '../db';
 import {
   conversations,
@@ -103,6 +103,44 @@ async function enrichConversation(conv: typeof conversations.$inferSelect, curre
     }
   }
 
+  // Unread count for the current user (messages from others newer than my
+  // last-read message). Tracked via conversation_members.last_read_message_id.
+  let unreadCount = 0;
+  const [myMembership] = await db
+    .select({ lastReadMessageId: conversationMembers.lastReadMessageId })
+    .from(conversationMembers)
+    .where(
+      and(
+        eq(conversationMembers.conversationId, conv.id),
+        eq(conversationMembers.userId, currentUserId),
+      ),
+    )
+    .limit(1);
+
+  if (myMembership) {
+    let since = sql`1=1`;
+    if (myMembership.lastReadMessageId) {
+      const [lastReadMsg] = await db
+        .select({ createdAt: messages.createdAt })
+        .from(messages)
+        .where(eq(messages.id, myMembership.lastReadMessageId))
+        .limit(1);
+      if (lastReadMsg) since = gt(messages.createdAt, lastReadMsg.createdAt);
+    }
+    const [unread] = await db
+      .select({ value: count() })
+      .from(messages)
+      .where(
+        and(
+          eq(messages.conversationId, conv.id),
+          sql`${messages.deletedAt} IS NULL`,
+          sql`${messages.senderId} != ${currentUserId}`,
+          since,
+        ),
+      );
+    unreadCount = unread?.value ?? 0;
+  }
+
   // For KAMETI conversations, get the group name
   let kametiGroupName: string | null = null;
   if (conv.type === 'KAMETI') {
@@ -128,6 +166,7 @@ async function enrichConversation(conv: typeof conversations.$inferSelect, curre
     lastMessage: lastMsg || undefined,
     name: conv.type === 'DIRECT' ? otherMemberName : (conv.type === 'KAMETI' && kametiGroupName) ? kametiGroupName : conv.type,
     otherMemberId,
+    unreadCount,
   };
 }
 
@@ -476,9 +515,60 @@ messagingRoutes.get(
           sql`${messages.deletedAt} IS NULL`,
         ),
       )
-      .orderBy(desc(messages.createdAt));
+      // Oldest → newest so chat UIs render top-to-bottom chronologically.
+      // Capped at 200 messages per request (recent window).
+      .orderBy(messages.createdAt)
+      .limit(Math.min(parseInt(c.req.query('limit') ?? '200', 10) || 200, 200));
 
     return c.json({ data: msgs });
+  },
+);
+
+// ──────────────────────────────────────────
+// Mark Conversation Read (read receipts)
+// ──────────────────────────────────────────
+
+messagingRoutes.post(
+  '/:communityId/conversations/:conversationId/read',
+  requireAuth,
+  tenantMiddleware,
+  requirePermission('messaging:read'),
+  async (c) => {
+    const user = c.get('user')!;
+    const conversationId = c.req.param('conversationId')!;
+
+    const member = await isConversationMember(conversationId, user.id);
+    if (!member) {
+      return c.json(
+        { error: { code: 'FORBIDDEN', message: 'You are not a member of this conversation.' } },
+        403,
+      );
+    }
+
+    // Point last_read_message_id at the newest message server-side.
+    const [newest] = await db
+      .select({ id: messages.id })
+      .from(messages)
+      .where(
+        and(
+          eq(messages.conversationId, conversationId),
+          sql`${messages.deletedAt} IS NULL`,
+        ),
+      )
+      .orderBy(desc(messages.createdAt))
+      .limit(1);
+
+    await db
+      .update(conversationMembers)
+      .set({ lastReadMessageId: newest?.id ?? null })
+      .where(
+        and(
+          eq(conversationMembers.conversationId, conversationId),
+          eq(conversationMembers.userId, user.id),
+        ),
+      );
+
+    return c.json({ data: { ok: true, lastReadMessageId: newest?.id ?? null } });
   },
 );
 

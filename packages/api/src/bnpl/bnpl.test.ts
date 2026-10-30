@@ -199,9 +199,16 @@ function baseCreateBody(overrides: Record<string, unknown> = {}) {
     downPayment: '100.00',
     installmentCount: 3,
     installmentFrequency: 'MONTHLY',
-    firstDueDate: '2026-10-27',
+    firstDueDate: futureDate(7),
     ...overrides,
   };
+}
+
+/** A due date N days from today (tests must never hardcode a fixed date). */
+function futureDate(daysAhead: number): string {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() + daysAhead);
+  return d.toISOString().slice(0, 10);
 }
 
 async function createContract(body = baseCreateBody()) {

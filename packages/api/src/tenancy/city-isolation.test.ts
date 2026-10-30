@@ -381,7 +381,7 @@ describe('City-based tenant isolation (Community A / Bhopal vs Community B / Ind
           downPayment: '0',
           installmentCount: 3,
           installmentFrequency: 'MONTHLY',
-          firstDueDate: '2026-10-27',
+          firstDueDate: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10),
         }),
       },
       { ENVIRONMENT: 'test' },

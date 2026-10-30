@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { and, eq, count, desc, inArray } from 'drizzle-orm';
+import { and, eq, count, desc, inArray, sql } from 'drizzle-orm';
 import { db } from '../db';
 import {
   kametiGroups,
@@ -10,7 +10,7 @@ import {
   kametiPayouts,
 } from '../db/schema/kameti';
 import { auditLogs } from '../db/schema/audit';
-import { conversations, conversationMembers } from '../db/schema/messaging';
+import { conversations, conversationMembers, messages } from '../db/schema/messaging';
 import { communityMemberships } from '../db/schema/communities';
 import { users } from '../db/schema/users';
 import { requireAuth } from '../auth/middleware';
@@ -18,6 +18,45 @@ import { tenantMiddleware } from '../tenancy/middleware';
 import { requirePermission } from '../rbac/middleware';
 
 const kametiRoutes = new Hono();
+
+/**
+ * Post an automated SYSTEM message into the community's KAMETI conversation.
+ * Financial chat notices are only ever derived from verified transaction
+ * records (contribution/payout rows) — never manually typed. Best-effort:
+ * failures never break the financial transaction.
+ */
+async function postKametiSystemMessage(
+  communityId: string,
+  actorId: string,
+  body: string,
+): Promise<void> {
+  try {
+    const [conv] = await db
+      .select({ id: conversations.id })
+      .from(conversations)
+      .where(
+        and(eq(conversations.communityId, communityId), eq(conversations.type, 'KAMETI')),
+      )
+      .limit(1);
+    if (!conv) return;
+
+    await db.insert(messages).values({
+      conversationId: conv.id,
+      senderId: actorId,
+      messageType: 'SYSTEM',
+      body,
+    });
+    await db
+      .update(conversations)
+      .set({ updatedAt: new Date() })
+      .where(eq(conversations.id, conv.id));
+  } catch (err) {
+    console.error('kameti_system_message_failed', {
+      communityId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
 
 // ──────────────────────────────────────────
 // Create Kameti Group (Admin)
@@ -77,26 +116,27 @@ kametiRoutes.post(
       newValues: { name: group.name, contributionAmount: group.contributionAmount },
     });
 
-    // Auto-create periods based on totalMembers and frequency
-    const startDate = new Date(result.data.startDate);
+    // Auto-create periods based on totalMembers and frequency.
+    // dueDate is the only date column — step by the group's frequency.
+    const startDate = new Date(`${result.data.startDate}T00:00:00Z`);
+    const stepDays =
+      result.data.frequency === 'WEEKLY' ? 7 : result.data.frequency === 'BIWEEKLY' ? 14 : 0;
     const periodsToCreate = [];
     for (let i = 0; i < result.data.totalMembers; i++) {
-      const periodStart = new Date(startDate);
-      periodStart.setMonth(periodStart.getMonth() + i);
-      const periodEnd = new Date(periodStart);
+      const due = new Date(startDate);
       if (result.data.frequency === 'MONTHLY') {
-        periodEnd.setMonth(periodEnd.getMonth() + 1);
-      } else if (result.data.frequency === 'WEEKLY') {
-        periodEnd.setDate(periodEnd.getDate() + 7);
-      } else if (result.data.frequency === 'BIWEEKLY') {
-        periodEnd.setDate(periodEnd.getDate() + 14);
+        // Same day next month(s), clamped to month length
+        const targetMonth = due.getUTCMonth() + i;
+        const lastDay = new Date(Date.UTC(due.getUTCFullYear(), targetMonth + 1, 0)).getUTCDate();
+        due.setUTCDate(Math.min(due.getUTCDate(), lastDay));
+        due.setUTCMonth(targetMonth);
+      } else {
+        due.setUTCDate(due.getUTCDate() + stepDays * i);
       }
       periodsToCreate.push({
         kametiGroupId: group.id,
         periodNumber: i + 1,
-        periodStart: periodStart.toISOString().split('T')[0],
-        periodEnd: periodEnd.toISOString().split('T')[0],
-        dueDate: periodEnd.toISOString().split('T')[0],
+        dueDate: due.toISOString().split('T')[0],
         status: i === 0 ? ('ACTIVE' as const) : ('PENDING' as const),
       });
     }
@@ -121,8 +161,26 @@ kametiRoutes.get(
     const tenant = c.get('tenant')!;
     const communityId = tenant.communityId;
 
+    // Include ACTIVE member counts. NOTE: the correlated subquery reference is
+    // written as literal qualified SQL — interpolating the Column object would
+    // compile to an unqualified "id" and resolve to the inner table.
     const groups = await db
-      .select()
+      .select({
+        id: kametiGroups.id,
+        communityId: kametiGroups.communityId,
+        name: kametiGroups.name,
+        description: kametiGroups.description,
+        contributionAmount: kametiGroups.contributionAmount,
+        frequency: kametiGroups.frequency,
+        totalMembers: kametiGroups.totalMembers,
+        startDate: kametiGroups.startDate,
+        endDate: kametiGroups.endDate,
+        status: kametiGroups.status,
+        createdBy: kametiGroups.createdBy,
+        createdAt: kametiGroups.createdAt,
+        updatedAt: kametiGroups.updatedAt,
+        currentMembers: sql<number>`(select count(*) from "kameti_members" mm where mm."kameti_group_id" = "kameti_groups"."id" and mm."status" = 'ACTIVE')`,
+      })
       .from(kametiGroups)
       .where(eq(kametiGroups.communityId, communityId))
       .orderBy(desc(kametiGroups.createdAt));
@@ -983,7 +1041,166 @@ kametiRoutes.post(
       newValues: { status: 'VERIFIED' },
     });
 
+    // Automated financial notice in the Kameti chat, derived from the
+    // verified transaction record.
+    const [period] = await db
+      .select({ periodNumber: kametiPeriods.periodNumber })
+      .from(kametiPeriods)
+      .where(eq(kametiPeriods.id, contribution.contribution.periodId))
+      .limit(1);
+    await postKametiSystemMessage(
+      communityId,
+      user.id,
+      `✅ Contribution verified — Period ${period?.periodNumber ?? '?'} (₹${contribution.contribution.amount})`,
+    );
+
     return c.json({ data: updated });
+  },
+);
+
+// ──────────────────────────────────────────
+// My Contribution Report (member self-report)
+// ──────────────────────────────────────────
+// A member reports their own payment. The contribution is created as PENDING
+// and only becomes PAID/VERIFIED after a treasurer with kameti:manage confirms
+// it — a member can never mark their own contribution as paid.
+const myContributionSchema = z.object({
+  periodId: z.string().uuid(),
+  paymentMethod: z.enum(['CASH', 'UPI', 'BANK_TRANSFER', 'OTHER']).optional(),
+  referenceNumber: z.string().max(255).optional(),
+  proofUrl: z.string().url().max(1000).optional(),
+});
+
+kametiRoutes.post(
+  '/:communityId/kameti/groups/:groupId/my-contribution',
+  requireAuth,
+  tenantMiddleware,
+  requirePermission('kameti:read'),
+  async (c) => {
+    const tenant = c.get('tenant')!;
+    const user = c.get('user')!;
+    const communityId = tenant.communityId;
+    const groupId = c.req.param('groupId')!;
+
+    const body = await c.req.json();
+    const result = myContributionSchema.safeParse(body);
+    if (!result.success) {
+      return c.json(
+        { error: { code: 'VALIDATION_ERROR', message: 'Invalid input' } },
+        400,
+      );
+    }
+
+    const [group] = await db
+      .select()
+      .from(kametiGroups)
+      .where(
+        and(eq(kametiGroups.id, groupId), eq(kametiGroups.communityId, communityId)),
+      )
+      .limit(1);
+    if (!group || group.status !== 'ACTIVE') {
+      return c.json(
+        { error: { code: 'NOT_FOUND', message: 'Active Kameti group not found.' } },
+        404,
+      );
+    }
+
+    // Caller must be an ACTIVE member of this group
+    const [myMember] = await db
+      .select()
+      .from(kametiMembers)
+      .where(
+        and(
+          eq(kametiMembers.kametiGroupId, groupId),
+          eq(kametiMembers.userId, user.id),
+          eq(kametiMembers.status, 'ACTIVE'),
+        ),
+      )
+      .limit(1);
+    if (!myMember) {
+      return c.json(
+        { error: { code: 'FORBIDDEN', message: 'Only active members can report contributions.' } },
+        403,
+      );
+    }
+
+    // Period must belong to this group and be open
+    const [period] = await db
+      .select()
+      .from(kametiPeriods)
+      .where(
+        and(
+          eq(kametiPeriods.id, result.data.periodId),
+          eq(kametiPeriods.kametiGroupId, groupId),
+        ),
+      )
+      .limit(1);
+    if (!period) {
+      return c.json({ error: { code: 'NOT_FOUND', message: 'Period not found.' } }, 404);
+    }
+    if (period.status === 'COMPLETED') {
+      return c.json(
+        { error: { code: 'INVALID_STATE', message: 'This period is already completed.' } },
+        400,
+      );
+    }
+
+    // Duplicate self-report for the same period
+    const [existing] = await db
+      .select({ id: kametiContributions.id, status: kametiContributions.status })
+      .from(kametiContributions)
+      .where(
+        and(
+          eq(kametiContributions.kametiGroupId, groupId),
+          eq(kametiContributions.memberId, myMember.id),
+          eq(kametiContributions.periodId, period.id),
+        ),
+      )
+      .limit(1);
+    if (existing) {
+      return c.json(
+        {
+          error: {
+            code: 'CONFLICT',
+            message:
+              existing.status === 'VERIFIED'
+                ? 'Your contribution for this period is already verified.'
+                : 'You already reported a contribution for this period. It is awaiting verification.',
+          },
+        },
+        409,
+      );
+    }
+
+    // Amount is server-set from the group agreement — never client-supplied.
+    const [contribution] = await db
+      .insert(kametiContributions)
+      .values({
+        kametiGroupId: groupId,
+        memberId: myMember.id,
+        periodId: period.id,
+        amount: group.contributionAmount,
+        paymentMethod: result.data.paymentMethod,
+        referenceNumber: result.data.referenceNumber,
+        proofUrl: result.data.proofUrl,
+        status: 'PENDING',
+      })
+      .returning();
+
+    await db.insert(auditLogs).values({
+      communityId,
+      actorId: user.id,
+      action: 'kameti.contribution.self_report',
+      entityType: 'kameti_contribution',
+      entityId: contribution.id,
+      newValues: {
+        periodNumber: period.periodNumber,
+        amount: contribution.amount,
+        status: 'PENDING',
+      },
+    });
+
+    return c.json({ data: contribution }, 201);
   },
 );
 
@@ -1124,6 +1341,14 @@ kametiRoutes.post(
       newValues: { amount, memberId, periodId },
     });
 
+    // Automated payout notice in the Kameti chat, derived from the payout
+    // record. Recipient position = payout slot for that period.
+    await postKametiSystemMessage(
+      communityId,
+      user.id,
+      `💰 Payout recorded — Period ${period.periodNumber} (₹${amount})`,
+    );
+
     return c.json({ data: payout }, 201);
   },
 );
@@ -1197,6 +1422,43 @@ kametiRoutes.get(
       );
     }
 
+    // Financial privacy: only ACTIVE members of this group (or community
+    // managers) may read the full report. Emails are stripped for non-managers.
+    const user = c.get('user')!;
+    type MembershipRole = typeof communityMemberships.role.enumValues[number];
+    const managerRoles: MembershipRole[] = ['SUPER_ADMIN', 'COMMUNITY_OWNER', 'COMMUNITY_ADMIN', 'COMMUNITY_FINANCE_MANAGER'];
+    const [managerRow] = await db
+      .select({ role: communityMemberships.role })
+      .from(communityMemberships)
+      .where(
+        and(
+          eq(communityMemberships.userId, user.id),
+          eq(communityMemberships.communityId, communityId),
+          inArray(communityMemberships.role, managerRoles),
+        ),
+      )
+      .limit(1);
+    const isManager = !!managerRow;
+
+    if (!isManager) {
+      const [membership] = await db
+        .select({ status: kametiMembers.status })
+        .from(kametiMembers)
+        .where(
+          and(
+            eq(kametiMembers.kametiGroupId, groupId),
+            eq(kametiMembers.userId, user.id),
+          ),
+        )
+        .limit(1);
+      if (!membership || membership.status !== 'ACTIVE') {
+        return c.json(
+          { error: { code: 'FORBIDDEN', message: 'Only active members of this Kameti group can view its financial report.' } },
+          403,
+        );
+      }
+    }
+
     const members = await db
       .select({
         id: kametiMembers.id,
@@ -1208,7 +1470,7 @@ kametiRoutes.get(
         createdAt: kametiMembers.createdAt,
         updatedAt: kametiMembers.updatedAt,
         name: users.name,
-        email: users.email,
+        email: isManager ? users.email : sql<string>`null`,
       })
       .from(kametiMembers)
       .innerJoin(users, eq(kametiMembers.userId, users.id))
