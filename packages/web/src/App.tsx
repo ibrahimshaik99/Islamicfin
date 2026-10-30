@@ -75,6 +75,7 @@ import MerchantBnplPage from './pages/merchant/BnplPage';
 
 import { CustomerShell } from './pages/customer/CustomerShell';
 import CustomerHome from './pages/customer/CustomerHome';
+import CustomerCommunityPage from './pages/customer/CustomerCommunityPage';
 import MarketplacePage from './pages/customer/MarketplacePage';
 import ProductDetailPage from './pages/customer/ProductDetailPage';
 import CartPage from './pages/customer/CartPage';
@@ -189,6 +190,7 @@ function App() {
 
               {/* Customer mobile-first routes (/app) */}
               <Route path="/app" element={<ProtectedRoute><CustomerShell><CustomerHome /></CustomerShell></ProtectedRoute>} />
+              <Route path="/app/community" element={<ProtectedRoute><CustomerShell><CustomerCommunityPage /></CustomerShell></ProtectedRoute>} />
               <Route path="/app/marketplace" element={<ProtectedRoute><CustomerShell><MarketplacePage /></CustomerShell></ProtectedRoute>} />
               <Route path="/app/products/:productId" element={<ProtectedRoute><ProductDetailPage /></ProtectedRoute>} />
               <Route path="/app/cart" element={<ProtectedRoute><CartPage /></ProtectedRoute>} />

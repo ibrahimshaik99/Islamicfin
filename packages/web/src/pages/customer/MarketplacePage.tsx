@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useApi } from '../../lib/useApi';
 import { useCart } from '../../context/CartContext';
@@ -10,10 +10,22 @@ export default function MarketplacePage() {
   const navigate = useNavigate();
   const { communityId } = useAuth();
   const prefix = communityId ? `/communities/${communityId}` : '';
-  const [search, setSearch] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
+  // Seed the search box from ?search= (e.g. the home-page search bar).
+  const [search, setSearch] = useState(() => searchParams.get('search') ?? '');
   const [selectedCategory, setSelectedCategory] = useState('');
   const { addItem } = useCart();
   const [addedId, setAddedId] = useState<string | null>(null);
+
+  // Keep the URL in sync so search results are shareable/back-button friendly.
+  useEffect(() => {
+    const current = searchParams.get('search') ?? '';
+    if (search.trim() === current.trim()) return;
+    const next = new URLSearchParams(searchParams);
+    if (search.trim()) next.set('search', search.trim());
+    else next.delete('search');
+    setSearchParams(next, { replace: true });
+  }, [search, searchParams, setSearchParams]);
 
   const { data: categories } = useApi<ProductCategory[]>(
     communityId ? `${prefix}/categories` : null,

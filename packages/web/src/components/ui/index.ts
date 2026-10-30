@@ -5,3 +5,4 @@ export { Card, CardHeader, CardContent, CardFooter } from './Card';
 export { Badge, OrderStatusBadge, PaymentStatusBadge, MerchantStatusBadge, ContractStatusBadge, ShariahReviewBadge } from './Badge';
 export { LoadingState, EmptyState, ErrorState } from './States';
 export { StatCard } from './StatCard';
+export { UserAvatar, OnlineStatus, UnreadBadge, TypingIndicator, LoadingSkeleton, ConfirmationDialog, EmptyStateCard } from './Identity';

@@ -33,31 +33,38 @@ export default function KametiPage() {
         startDate: form.startDate,
       },
     });
-    if (result !== null) {
-      setActionMessage({ type: 'success', text: `Kameti group "${form.name.trim()}" created` });
-      setTimeout(() => setActionMessage(null), 3000);
+    if (result === null) {
+      // mutate() already surfaced the error via mutateError — keep the form open.
+      return;
     }
+    setActionMessage({ type: 'success', text: `Kameti group "${form.name.trim()}" created` });
+    setTimeout(() => setActionMessage(null), 3000);
     setForm({ name: '', description: '', contributionAmount: '', frequency: 'MONTHLY', maxMembers: '10', startDate: '' });
     setShowCreate(false);
     refetch();
   };
 
   const columns = [
-    { key: 'name', label: 'Name' },
-    { key: 'contributionAmount', label: 'Amount', render: (item: Record<string, unknown>) => (
-      <span className="text-sm font-medium text-slate-900">₹{String(item.contributionAmount)}</span>
+    { key: 'name', label: 'Name', render: (item: Record<string, unknown>) => (
+      <span className="text-sm font-semibold text-ink">{String(item.name)}</span>
     )},
-    { key: 'frequency', label: 'Frequency' },
+    { key: 'contributionAmount', label: 'Amount', render: (item: Record<string, unknown>) => (
+      <span className="text-sm font-medium text-ink">₹{String(item.contributionAmount)}</span>
+    )},
+    { key: 'frequency', label: 'Frequency', render: (item: Record<string, unknown>) => (
+      <span className="text-sm text-muted capitalize">{String(item.frequency).toLowerCase()}</span>
+    )},
     { key: 'currentMembers', label: 'Members', render: (item: Record<string, unknown>) => (
-      <span className="text-sm text-slate-600">{String(item.currentMembers)} / {String(item.totalMembers)}</span>
+      <span className="text-sm text-muted">{String(item.currentMembers)} / {String(item.totalMembers)}</span>
     )},
     { key: 'status', label: 'Status', render: (item: Record<string, unknown>) => <StatusBadge status={String(item.status)} /> },
     { key: 'startDate', label: 'Start', render: (item: Record<string, unknown>) => (
-      <span className="text-sm text-slate-500">{new Date(String(item.startDate)).toLocaleDateString()}</span>
+      <span className="text-sm text-muted">{new Date(String(item.startDate)).toLocaleDateString('en-IN')}</span>
     )},
     { key: 'actions', label: '', render: (item: Record<string, unknown>) => (
-      <div className="flex gap-2">
-        <button onClick={() => navigate(`/community/kameti/${String(item.id)}`)} className="text-xs text-teal-600 hover:text-teal-700 font-medium">View Report</button>
+      <div className="flex gap-3">
+        <button onClick={() => navigate(`/community/kameti/${String(item.id)}`)} className="text-xs text-primary-600 hover:text-primary-700 font-semibold">View Report</button>
+        <button onClick={() => navigate(`/community/kameti/${String(item.id)}/chat`)} className="text-xs text-primary-600 hover:text-primary-700 font-semibold">Chat</button>
       </div>
     )},
   ];
@@ -65,7 +72,7 @@ export default function KametiPage() {
   return (
     <DashboardLayout title="Kameti" navItems={communityNav} navTitle="Community">
       {actionMessage && (
-        <div className={`mb-4 px-4 py-3 rounded-2xl text-sm font-medium ${actionMessage.type === 'success' ? 'bg-teal-50 text-teal-800 border border-teal-200' : 'bg-red-50 text-red-800 border border-red-200'}`}>
+        <div className={`mb-4 px-4 py-3 rounded-2xl text-sm font-medium border ${actionMessage.type === 'success' ? 'bg-primary-50 text-primary-800 border-primary-200' : 'bg-red-50 text-red-800 border-red-200'}`}>
           {actionMessage.text}
         </div>
       )}
@@ -79,7 +86,7 @@ export default function KametiPage() {
       {!loading && !error && (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-slate-900">Kameti Groups ({data.length})</h2>
+            <h2 className="text-lg font-bold text-ink">Kameti Groups ({data.length})</h2>
             <div className="flex items-center gap-2">
               <Button onClick={() => setShowCreate(!showCreate)}>{showCreate ? 'Cancel' : 'Create Kameti'}</Button>
               <Button onClick={() => { refetch(); }} variant="secondary">Refresh</Button>

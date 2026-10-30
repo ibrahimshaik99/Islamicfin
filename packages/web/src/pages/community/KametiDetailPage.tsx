@@ -2,344 +2,628 @@ import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useApi, useMutation } from '../../lib/useApi';
-import { LoadingState, ErrorState, Card, CardContent, Button } from '../../components/ui';
-import { StatusBadge } from '../../components/admin/AdminComponents';
-import type { KametiReport } from '../../lib/types';
+import { useRealtimeConversations, useRealtimeMessages } from '../../lib/useRealtime';
+import { LoadingState, ErrorState, EmptyStateCard, UserAvatar } from '../../components/ui';
+import { ChatThread } from '../../components/chat';
+import { conversationTitle } from '../../components/chat/chatUtils';
+import type { KametiReport, KametiContribution } from '../../lib/types';
 
-interface PayoutModalState { periodId: string; memberId: string; }
+/**
+ * Community-manager Kameti workspace.
+ *
+ * Tabs: Overview / Members / Contributions / Payouts / Transactions / Chat /
+ * Settings. Manager-only actions (mark PAID, verify, record payout, edit
+ * group) call the kameti:manage-protected routes. All errors from mutate()
+ * are surfaced visibly (mutate returns null on failure).
+ */
+type Tab = 'overview' | 'members' | 'contributions' | 'payouts' | 'transactions' | 'chat' | 'settings';
+
+const TABS: { id: Tab; label: string }[] = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'members', label: 'Members' },
+  { id: 'contributions', label: 'Contributions' },
+  { id: 'payouts', label: 'Payouts' },
+  { id: 'transactions', label: 'Transactions' },
+  { id: 'chat', label: 'Chat' },
+  { id: 'settings', label: 'Settings' },
+];
+
+interface PayoutModalState {
+  periodId: string;
+  memberId: string;
+}
 
 export default function KametiDetailPage() {
   const { groupId } = useParams<{ groupId: string }>();
   const navigate = useNavigate();
   const { communityId, user } = useAuth();
   const prefix = communityId ? `/communities/${communityId}` : '';
-  const [tab, setTab] = useState<'overview' | 'members' | 'periods' | 'contributions' | 'payouts'>('overview');
+  const [tab, setTab] = useState<Tab>('overview');
   const [payoutModal, setPayoutModal] = useState<PayoutModalState | null>(null);
   const [payoutAmount, setPayoutAmount] = useState('');
   const [payoutRef, setPayoutRef] = useState('');
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [actionSuccess, setActionSuccess] = useState<string | null>(null);
+  const [nameDraft, setNameDraft] = useState<string | null>(null);
+  const [statusDraft, setStatusDraft] = useState<string | null>(null);
 
   const { data: report, loading, error, refetch } = useApi<KametiReport>(
     communityId && groupId ? `${prefix}/kameti/groups/${groupId}/report` : null,
   );
 
-  const { mutate, loading: mutating } = useMutation();
+  // Chat tab: community KAMETI conversation.
+  const { conversations, loading: convLoad } = useRealtimeConversations(
+    communityId && tab === 'chat' ? communityId : null,
+    user?.id,
+  );
+  const kametiConv = conversations.find((c) => c.type === 'KAMETI') || null;
+  const {
+    messages,
+    loading: msgLoad,
+    error: msgErr,
+    refetch: refetchMsg,
+    sendMessage,
+  } = useRealtimeMessages(communityId, tab === 'chat' ? kametiConv?.id : null);
+
+  const { mutate } = useMutation();
+
+  const flash = (msg: string | null, ok: boolean) => {
+    if (ok) {
+      setActionSuccess(msg);
+      setActionError(null);
+    } else {
+      setActionError(msg);
+      setActionSuccess(null);
+    }
+  };
+
+  /** Wrap a mutation with visible success/error feedback. */
+  const runAction = async (
+    path: string,
+    body: unknown,
+    successMsg: string,
+    failMsg: string,
+    method = 'POST',
+  ) => {
+    const res = await mutate(path, { method, body });
+    if (res === null) {
+      flash(failMsg, false);
+      return false;
+    }
+    flash(successMsg, true);
+    refetch();
+    return true;
+  };
+
+  const markPaid = (contributionId: string) =>
+    runAction(
+      `${prefix}/kameti/contributions/${contributionId}/pay`,
+      undefined,
+      'Contribution marked as PAID.',
+      'Could not mark the contribution as paid.',
+    );
+
+  const verifyContribution = (contributionId: string) =>
+    runAction(
+      `${prefix}/kameti/contributions/${contributionId}/verify`,
+      undefined,
+      'Contribution verified.',
+      'Could not verify the contribution.',
+    );
 
   const handleMarkPayout = async () => {
     if (!payoutModal || !report) return;
-    try {
-      await mutate(`${prefix}/kameti/payouts`, {
-        body: {
-          groupId,
-          periodId: payoutModal.periodId,
-          memberId: payoutModal.memberId,
-          amount: payoutAmount || report.group.contributionAmount,
-          referenceNumber: payoutRef.trim() || undefined,
-        },
-      });
+    const ok = await runAction(
+      `${prefix}/kameti/payouts`,
+      {
+        memberId: payoutModal.memberId,
+        periodId: payoutModal.periodId,
+        amount: payoutAmount || report.group.contributionAmount,
+        referenceNumber: payoutRef.trim() || undefined,
+      },
+      'Payout recorded.',
+      'Could not record the payout.',
+    );
+    if (ok) {
       setPayoutModal(null);
       setPayoutAmount('');
       setPayoutRef('');
-      refetch();
-    } catch { /* handled */ }
+    }
   };
 
-  const getContributionsForPeriod = (periodId: string) => (report?.contributions || []).filter((c) => c.periodId === periodId);
-  const getPayoutForMemberPeriod = (memberId: string, periodId: string) => (report?.payouts || []).find((p) => p.memberId === memberId && p.periodId === periodId);
-  const getMemberContributionForPeriod = (memberId: string, periodId: string) => (report?.contributions || []).find((c) => c.memberId === memberId && c.periodId === periodId);
+  const handleSaveSettings = async () => {
+    if (!groupId) return;
+    const body: Record<string, string> = {};
+    if (nameDraft !== null && nameDraft.trim()) body.name = nameDraft.trim();
+    if (statusDraft !== null) body.status = statusDraft;
+    if (Object.keys(body).length === 0) {
+      flash('Nothing to update.', false);
+      return;
+    }
+    const ok = await runAction(
+      `${prefix}/kameti/groups/${groupId}`,
+      body,
+      'Group settings updated.',
+      'Could not update group settings.',
+      'PATCH',
+    );
+    if (ok) {
+      setNameDraft(null);
+      setStatusDraft(null);
+    }
+  };
+
+  const getMemberName = (memberId: string) => {
+    const m = report?.members.find((x) => x.id === memberId);
+    return m?.name || m?.email || 'Unknown member';
+  };
+  const getContrib = (memberId: string, periodId: string): KametiContribution | undefined =>
+    report?.contributions.find((c) => c.memberId === memberId && c.periodId === periodId);
+  const getPayout = (memberId: string, periodId: string) =>
+    report?.payouts.find((p) => p.memberId === memberId && p.periodId === periodId);
+
   const totalPeriods = report?.summary.totalPeriods || 0;
   const completedPeriods = report?.summary.completedPeriods || 0;
-  const periodsLeft = totalPeriods - completedPeriods;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-30">
-        <div className="flex items-center h-12 px-4 max-w-5xl mx-auto">
-          <button onClick={() => navigate(-1)} className="touch-target -ml-2 flex items-center justify-center">
-            <svg className="h-5 w-5 text-gray-700" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+    <div className="min-h-screen bg-surface">
+      {/* Header */}
+      <div className="bg-primary-700 text-white sticky top-0 z-30 safe-top">
+        <div className="max-w-5xl mx-auto flex items-center gap-3 h-14 px-4">
+          <button
+            onClick={() => navigate(-1)}
+            aria-label="Go back"
+            className="touch-target -ml-2 flex items-center justify-center rounded-xl hover:bg-white/10 transition-colors"
+          >
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
             </svg>
           </button>
-          <h1 className="text-sm font-semibold text-gray-900 ml-2">Kameti Report</h1>
-          <div className="ml-auto flex items-center gap-2">
-            <span className="text-[10px] text-gray-400">Live</span>
-            <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-            {report?.group.status === 'ACTIVE' && (
-              <button onClick={() => navigate(`/community/kameti/${groupId}/chat`)} className="ml-2 px-3 py-1.5 text-xs font-medium text-teal-700 bg-teal-50 rounded-lg hover:bg-teal-100 transition-colors flex items-center gap-1.5">
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.76c0 1.6 1.123 2.994 2.707 3.227 1.068.157 2.148.279 3.238.364.466.037.893.281 1.153.671L12 21l2.652-3.978c.26-.39.687-.634 1.153-.67 1.09-.086 2.17-.208 3.238-.365 1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" />
-                </svg>
-                Group Chat
-              </button>
-            )}
+          <div className="min-w-0 flex-1">
+            <h1 className="text-sm font-bold truncate">{report?.group.name || 'Kameti'}</h1>
+            <p className="text-[11px] text-white/70 truncate">Kameti workspace</p>
           </div>
+          <button
+            onClick={() => navigate('/community/kameti')}
+            className="px-3 py-1.5 text-[11px] font-semibold bg-white/10 rounded-lg hover:bg-white/20 transition-colors"
+          >
+            All groups
+          </button>
         </div>
       </div>
 
       {loading && <div className="p-8"><LoadingState /></div>}
-      {error && <div className="p-4"><ErrorState message={error} onRetry={refetch} /></div>}
+      {error && <div className="max-w-5xl mx-auto p-4"><ErrorState message={error} onRetry={refetch} /></div>}
+
+      {(actionError || actionSuccess) && (
+        <div className="max-w-5xl mx-auto px-4 pt-4">
+          <div
+            className={`flex items-start gap-2 rounded-xl px-4 py-3 border ${
+              actionSuccess ? 'bg-primary-50 border-primary-200' : 'bg-red-50 border-red-200'
+            }`}
+          >
+            <p className={`text-sm flex-1 ${actionSuccess ? 'text-primary-800' : 'text-red-700'}`}>
+              {actionSuccess || actionError}
+            </p>
+            <button
+              onClick={() => {
+                setActionError(null);
+                setActionSuccess(null);
+              }}
+              aria-label="Dismiss"
+              className={actionSuccess ? 'text-primary-500' : 'text-red-500'}
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
 
       {report && (
-        <div className="max-w-5xl mx-auto p-4 space-y-6 animate-in fade-in">
-          <Card>
-            <CardContent>
-              <div className="flex items-start justify-between">
-                <div>
-                  <h2 className="text-lg font-bold text-gray-900">{report.group.name}</h2>
-                  {report.group.description && <p className="text-sm text-gray-500 mt-1">{report.group.description}</p>}
-                </div>
-                <StatusBadge status={report.group.status} />
+        <div className="max-w-5xl mx-auto p-4 space-y-4 animate-in">
+          {/* Summary */}
+          <div className="bg-white rounded-2xl border border-line shadow-card p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h2 className="text-lg font-bold text-ink truncate">{report.group.name}</h2>
+                {report.group.description && <p className="text-sm text-muted mt-1">{report.group.description}</p>}
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4">
-                <Stat label="Contribution" value={`₹${report.group.contributionAmount}`} sub={report.group.frequency} />
-                <Stat label="Members" value={`${report.summary.activeMembers}/${report.summary.totalMembers}`} sub="active/total" />
-                <Stat label="Periods" value={`${completedPeriods}/${totalPeriods}`} sub={`${periodsLeft} left`} />
-                <Stat label="Balance" value={`₹${report.summary.balance}`} sub="net balance" />
-              </div>
-              <div className="grid grid-cols-2 gap-4 mt-3">
-                <div className="bg-green-50 rounded-lg p-3">
-                  <p className="text-xs text-green-600">Total Collected</p>
-                  <p className="text-lg font-bold text-green-700">₹{report.summary.totalContributions}</p>
-                </div>
-                <div className="bg-blue-50 rounded-lg p-3">
-                  <p className="text-xs text-blue-600">Total Distributed</p>
-                  <p className="text-lg font-bold text-blue-700">₹{report.summary.totalPayouts}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              <span
+                className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full flex-shrink-0 ${
+                  report.group.status === 'ACTIVE' ? 'bg-primary-50 text-primary-700' : 'bg-surface text-muted border border-line'
+                }`}
+              >
+                {report.group.status}
+              </span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
+              <Tile label="Contribution" value={`₹${report.group.contributionAmount}`} sub={report.group.frequency.toLowerCase()} tint="bg-primary-50 text-primary-700" />
+              <Tile label="Members" value={`${report.summary.activeMembers}/${report.summary.totalMembers}`} sub="active/total" tint="bg-sky-50 text-sky-700" />
+              <Tile label="Periods" value={`${completedPeriods}/${totalPeriods}`} sub="completed" tint="bg-gold-50 text-gold-700" />
+              <Tile label="Balance" value={`₹${report.summary.balance}`} sub="in hand" tint="bg-emerald-50 text-emerald-700" />
+            </div>
+          </div>
 
-          <div className="flex gap-1 bg-gray-100 p-1 rounded-lg">
-            {(['overview', 'members', 'periods', 'contributions', 'payouts'] as const).map((t) => (
-              <button key={t} onClick={() => setTab(t)} className={`flex-1 py-2 text-xs font-medium rounded-md transition-colors capitalize ${tab === t ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}>{t}</button>
+          {/* Tabs */}
+          <div className="flex gap-1 bg-white p-1 rounded-xl border border-line shadow-card overflow-x-auto hide-scrollbar" role="tablist" aria-label="Kameti sections">
+            {TABS.map((t) => (
+              <button
+                key={t.id}
+                role="tab"
+                aria-selected={tab === t.id}
+                onClick={() => setTab(t.id)}
+                className={`flex-1 min-w-[84px] py-2 text-xs font-bold rounded-lg transition-colors capitalize ${
+                  tab === t.id ? 'bg-primary-600 text-white' : 'text-muted hover:text-ink'
+                }`}
+              >
+                {t.label}
+              </button>
             ))}
           </div>
 
+          {/* Overview */}
           {tab === 'overview' && (
-            <Card>
-              <CardContent>
-                <h3 className="text-sm font-semibold text-gray-900 mb-3">Group Information</h3>
-                <div className="space-y-2 text-sm">
-                  <Row label="Start Date" value={new Date(report.group.startDate).toLocaleDateString()} />
-                  {report.group.endDate && <Row label="End Date" value={new Date(report.group.endDate).toLocaleDateString()} />}
-                  <Row label="Total Members" value={String(report.summary.totalMembers)} />
-                  <Row label="Active Members" value={String(report.summary.activeMembers)} />
-                  <Row label="Completed Periods" value={`${completedPeriods}/${totalPeriods}`} />
-                  <Row label="Periods Left" value={String(periodsLeft)} />
-                  <Row label="Total Collected" value={`₹${report.summary.totalContributions}`} />
-                  <Row label="Total Distributed" value={`₹${report.summary.totalPayouts}`} />
-                  <Row label="Balance" value={`₹${report.summary.balance}`} />
-                </div>
-              </CardContent>
-            </Card>
+            <div className="bg-white rounded-2xl border border-line shadow-card p-5 space-y-3">
+              <InfoRow label="Start date" value={new Date(report.group.startDate).toLocaleDateString('en-IN')} />
+              {report.group.endDate && <InfoRow label="End date" value={new Date(report.group.endDate).toLocaleDateString('en-IN')} />}
+              <InfoRow label="Total collected (verified)" value={`₹${report.summary.totalContributions}`} />
+              <InfoRow label="Total distributed (completed)" value={`₹${report.summary.totalPayouts}`} />
+              <InfoRow label="Balance" value={`₹${report.summary.balance}`} />
+            </div>
           )}
 
+          {/* Members */}
           {tab === 'members' && (
-            <Card>
-              <CardContent>
-                <h3 className="text-sm font-semibold text-gray-900 mb-3">Members ({report.members.length})</h3>
-                <div className="space-y-2">
-                  {report.members.map((m) => (
-                    <div key={m.id} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-teal-100 flex items-center justify-center">
-                          <span className="text-xs font-bold text-teal-700">{(m.name || m.email || '?')[0]}</span>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">{m.name || m.email}</p>
-                          {m.userId === user?.id && <p className="text-[10px] text-teal-500 font-medium">You</p>}
-                        </div>
-                      </div>
-                      <StatusBadge status={m.status} />
+            <div className="bg-white rounded-2xl border border-line shadow-card divide-y divide-line">
+              {report.members.length === 0 ? (
+                <p className="text-sm text-muted text-center py-8">No members yet.</p>
+              ) : (
+                report.members.map((m) => (
+                  <div key={m.id} className="flex items-center gap-3 px-4 py-3">
+                    <UserAvatar name={m.name || m.email || '?'} size="md" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-ink truncate">{m.name || m.email}</p>
+                      <p className="text-[11px] text-muted">Payout position #{m.position}</p>
                     </div>
-                  ))}
-                  {report.members.length === 0 && <p className="text-sm text-gray-500">No members yet.</p>}
-                </div>
-              </CardContent>
-            </Card>
+                    <span
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                        m.status === 'ACTIVE' ? 'bg-primary-50 text-primary-700' : 'bg-surface text-muted border border-line'
+                      }`}
+                    >
+                      {m.status}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
           )}
 
-          {tab === 'periods' && (
-            <Card>
-              <CardContent>
-                <h3 className="text-sm font-semibold text-gray-900 mb-3">Periods ({report.periods.length})</h3>
-                <div className="space-y-3">
-                  {report.periods.map((p) => {
-                    const periodContributions = getContributionsForPeriod(p.id);
-                    const paidCount = periodContributions.filter((c) => c.status === 'VERIFIED' || c.status === 'PAID').length;
-                    const totalMembers = report.summary.activeMembers;
-                    const isActive = p.status === 'ACTIVE';
-                    const isCompleted = p.status === 'COMPLETED';
-                    return (
-                      <div key={p.id} className={`rounded-xl p-4 border ${isActive ? 'border-blue-200 bg-blue-50/50' : isCompleted ? 'border-green-200 bg-green-50/50' : 'border-gray-100'}`}>
-                        <div className="flex items-center justify-between mb-2">
-                          <div>
-                            <p className="text-sm font-bold text-gray-900">Period {p.periodNumber}</p>
-                            <p className="text-[10px] text-gray-400">{new Date(p.startDate).toLocaleDateString()}</p>
-                          </div>
-                          <StatusBadge status={p.status} />
-                        </div>
-                        <div className="flex items-center gap-4 text-[11px]">
-                          <span className={`${paidCount === totalMembers ? 'text-green-600 font-bold' : 'text-gray-600'}`}>
-                            {paidCount}/{totalMembers} paid
-                          </span>
-                          {isActive && <span className="text-blue-500 font-medium">Current</span>}
-                          {isCompleted && <span className="text-green-500">Done</span>}
-                        </div>
-                      </div>
-                    );
-                  })}
-                  {report.periods.length === 0 && <p className="text-sm text-gray-500">No periods yet.</p>}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
+          {/* Contributions (manager workflow: PAID → VERIFIED) */}
           {tab === 'contributions' && (
-            <Card>
-              <CardContent>
-                <h3 className="text-sm font-semibold text-gray-900 mb-3">Contribution History ({report.contributions.length})</h3>
-                <div className="space-y-4">
-                  {report.periods.map((p) => {
-                    return (
-                      <div key={p.id}>
-                        <p className="text-xs font-bold text-gray-700 mb-2">Period {p.periodNumber}</p>
-                        <div className="space-y-2">
-                          {report.members.filter((m) => m.status === 'ACTIVE').map((m) => {
-                            const contrib = getMemberContributionForPeriod(m.id, p.id);
-                            return (
-                              <div key={m.id} className="flex items-center justify-between py-2 px-3 bg-gray-50 rounded-lg border border-gray-100">
-                                <div className="flex items-center gap-2">
-                                  <div className="w-6 h-6 rounded-full bg-teal-100 flex items-center justify-center">
-                                    <span className="text-[10px] font-bold text-teal-700">{(m.name || m.email || '?')[0]}</span>
-                                  </div>
-                                  <div>
-                                    <p className="text-sm font-medium text-gray-900">{m.name || m.email}</p>
-                                    {contrib && (
-                                      <p className="text-[10px] text-gray-500">
-                                        {contrib.paymentMethod || 'N/A'} {contrib.referenceNumber ? `· Ref: ${contrib.referenceNumber}` : ''}
-                                      </p>
-                                    )}
-                                  </div>
-                                </div>
-                                {contrib ? (
-                                  <StatusBadge status={contrib.status} />
-                                ) : (
-                                  <span className="text-[10px] text-gray-300">No record</span>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    );
-                  })}
-                  {report.contributions.length === 0 && <p className="text-sm text-gray-500">No contributions recorded yet.</p>}
+            <div className="space-y-3">
+              {report.periods.length === 0 && (
+                <div className="bg-white rounded-2xl border border-line">
+                  <EmptyStateCard title="No periods yet" description="Periods are generated when the group starts." />
                 </div>
-              </CardContent>
-            </Card>
+              )}
+              {report.periods.map((p) => (
+                <div key={p.id} className="bg-white rounded-2xl border border-line shadow-card overflow-hidden">
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-line bg-surface/50">
+                    <div>
+                      <p className="text-sm font-bold text-ink">Period {p.periodNumber}</p>
+                      <p className="text-[11px] text-muted">Due {new Date(p.dueDate).toLocaleDateString('en-IN')}</p>
+                    </div>
+                    <PeriodStatusBadge status={p.status} />
+                  </div>
+                  <div className="divide-y divide-line">
+                    {report.members.filter((m) => m.status === 'ACTIVE').map((m) => {
+                      const contrib = getContrib(m.id, p.id);
+                      return (
+                        <div key={m.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold text-ink truncate">{m.name || m.email}</p>
+                            {contrib ? (
+                              <p className="text-[11px] text-muted truncate">
+                                ₹{contrib.amount} · {contrib.paymentMethod || '—'}
+                                {contrib.referenceNumber ? ` · Ref ${contrib.referenceNumber}` : ''}
+                              </p>
+                            ) : (
+                              <p className="text-[11px] text-muted">No record</p>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            {contrib ? (
+                              <>
+                                <ContributionBadge status={contrib.status} />
+                                {contrib.status === 'PENDING' && (
+                                  <button
+                                    onClick={() => markPaid(contrib.id)}
+                                    className="px-2.5 py-1 text-[10px] font-bold text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors"
+                                  >
+                                    Mark PAID
+                                  </button>
+                                )}
+                                {contrib.status === 'PAID' && (
+                                  <button
+                                    onClick={() => verifyContribution(contrib.id)}
+                                    className="px-2.5 py-1 text-[10px] font-bold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition-colors"
+                                  >
+                                    Verify
+                                  </button>
+                                )}
+                              </>
+                            ) : (
+                              <span className="text-[10px] text-muted">—</span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
 
+          {/* Payouts (per member×period) */}
           {tab === 'payouts' && (
-            <Card>
-              <CardContent>
-                <h3 className="text-sm font-semibold text-gray-900 mb-3">Mark Payout Per Member ({report.periods.length} periods)</h3>
-                <div className="space-y-6">
-                  {report.periods.map((p) => {
-                    const periodContributions = getContributionsForPeriod(p.id);
-                    return (
-                      <div key={p.id} className="border border-gray-200 rounded-xl overflow-hidden">
-                        <div className="bg-gray-50 px-4 py-2.5 border-b border-gray-200">
-                          <p className="text-sm font-bold text-gray-900">Period {p.periodNumber}</p>
-                          <p className="text-[10px] text-gray-400">{periodContributions.filter((c) => c.status === 'VERIFIED' || c.status === 'PAID').length}/{report.summary.activeMembers} members paid</p>
-                        </div>
-                        <div className="divide-y divide-gray-100">
-                          {report.members.filter((m) => m.status === 'ACTIVE').map((m) => {
-                            const contrib = getMemberContributionForPeriod(m.id, p.id);
-                            const existingPayout = getPayoutForMemberPeriod(m.id, p.id);
-                            return (
-                              <div key={m.id} className="px-4 py-3 flex items-center justify-between gap-3">
-                                <div className="flex items-center gap-3 min-w-0">
-                                  <div className="w-8 h-8 rounded-full bg-teal-100 flex items-center justify-center shrink-0">
-                                    <span className="text-xs font-bold text-teal-700">{(m.name || m.email || '?')[0]}</span>
-                                  </div>
-                                  <div className="min-w-0">
-                                    <p className="text-sm font-medium text-gray-900 truncate">{m.name || m.email}</p>
-                                    <p className="text-[10px] text-gray-400">
-                                      {contrib ? `Paid: ₹${contrib.amount} (${contrib.status})` : 'No contribution'}
-                                    </p>
-                                    {existingPayout && (
-                                      <p className="text-[10px] text-green-600 font-medium">
-                                        Payout: ₹{existingPayout.amount} ({existingPayout.status})
-                                        {existingPayout.referenceNumber ? ` · Ref: ${existingPayout.referenceNumber}` : ''}
-                                      </p>
-                                    )}
-                                  </div>
-                                </div>
-                                <div className="shrink-0">
-                                  {existingPayout ? (
-                                    <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-green-50 text-green-600">Paid</span>
-                                  ) : (
-                                    <button
-                                      onClick={() => {
-                                        setPayoutModal({ periodId: p.id, memberId: m.id });
-                                        setPayoutAmount(contrib?.amount || report.group.contributionAmount);
-                                        setPayoutRef('');
-                                      }}
-                                      className="px-3 py-1.5 text-[11px] font-medium text-white bg-teal-600 rounded-lg hover:bg-teal-700 transition-colors"
-                                    >
-                                      Mark Payout
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    );
-                  })}
-                  {report.periods.length === 0 && <p className="text-sm text-gray-500">No periods yet.</p>}
+            <div className="space-y-3">
+              {report.periods.length === 0 && (
+                <div className="bg-white rounded-2xl border border-line">
+                  <EmptyStateCard title="No periods yet" description="Payouts appear once periods exist." />
                 </div>
-              </CardContent>
-            </Card>
+              )}
+              {report.periods.map((p) => (
+                <div key={p.id} className="bg-white rounded-2xl border border-line shadow-card overflow-hidden">
+                  <div className="px-4 py-3 border-b border-line bg-surface/50">
+                    <p className="text-sm font-bold text-ink">Period {p.periodNumber}</p>
+                    <p className="text-[11px] text-muted">Due {new Date(p.dueDate).toLocaleDateString('en-IN')}</p>
+                  </div>
+                  <div className="divide-y divide-line">
+                    {report.members.filter((m) => m.status === 'ACTIVE').map((m) => {
+                      const contrib = getContrib(m.id, p.id);
+                      const existing = getPayout(m.id, p.id);
+                      return (
+                        <div key={m.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold text-ink truncate">{m.name || m.email}</p>
+                            <p className="text-[11px] text-muted truncate">
+                              {contrib ? `Contribution ₹${contrib.amount} (${contrib.status})` : 'No contribution'}
+                            </p>
+                            {existing && (
+                              <p className="text-[11px] text-primary-700 font-medium">
+                                Payout ₹{existing.amount} ({existing.status})
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex-shrink-0">
+                            {existing ? (
+                              <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-primary-50 text-primary-700">Paid</span>
+                            ) : (
+                              <button
+                                onClick={() => {
+                                  setPayoutModal({ periodId: p.id, memberId: m.id });
+                                  setPayoutAmount(contrib?.amount || report.group.contributionAmount);
+                                  setPayoutRef('');
+                                }}
+                                className="px-3 py-1.5 text-[11px] font-bold text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors"
+                              >
+                                Mark Payout
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Transactions */}
+          {tab === 'transactions' && (
+            <div className="bg-white rounded-2xl border border-line shadow-card divide-y divide-line">
+              {(() => {
+                const ledger = [
+                  ...report.contributions.map((c) => ({
+                    kind: 'in' as const,
+                    id: c.id,
+                    amount: c.amount,
+                    status: c.status,
+                    who: getMemberName(c.memberId),
+                    periodId: c.periodId,
+                    date: c.createdAt,
+                  })),
+                  ...report.payouts.map((p) => ({
+                    kind: 'out' as const,
+                    id: p.id,
+                    amount: p.amount,
+                    status: p.status,
+                    who: getMemberName(p.memberId),
+                    periodId: p.periodId,
+                    date: p.createdAt,
+                  })),
+                ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+                if (ledger.length === 0) {
+                  return <p className="text-sm text-muted text-center py-8">No transactions yet.</p>;
+                }
+                return ledger.map((t) => {
+                  const period = report.periods.find((x) => x.id === t.periodId);
+                  const isIn = t.kind === 'in';
+                  return (
+                    <div key={`${t.kind}-${t.id}`} className="flex items-center gap-3 px-4 py-3">
+                      <span
+                        className={`h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                          isIn ? 'bg-primary-50 text-primary-600' : 'bg-sky-50 text-sky-600'
+                        }`}
+                      >
+                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                          {isIn ? (
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m0-15l-6 6m6-6l6 6" />
+                          ) : (
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 19.5v-15m0 15l6-6m-6 6l-6-6" />
+                          )}
+                        </svg>
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold text-ink truncate">
+                          {isIn ? 'Contribution from' : 'Payout to'} {t.who}
+                        </p>
+                        <p className="text-[11px] text-muted">
+                          Period {period?.periodNumber ?? '—'} · {new Date(t.date).toLocaleDateString('en-IN')}
+                        </p>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <p className={`text-sm font-bold ${isIn ? 'text-primary-600' : 'text-ink'}`}>
+                          {isIn ? '+' : '−'}₹{t.amount}
+                        </p>
+                        <span className="text-[10px] text-muted">{t.status}</span>
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+          )}
+
+          {/* Chat */}
+          {tab === 'chat' && (
+            <div className="bg-white rounded-2xl border border-line shadow-card overflow-hidden">
+              {convLoad && <div className="p-6"><LoadingState /></div>}
+              {!convLoad && !kametiConv && (
+                <EmptyStateCard
+                  title="No group chat yet"
+                  description="The Kameti conversation is created when the group gets its first member."
+                />
+              )}
+              {kametiConv && (
+                <div className="h-[60vh]">
+                  <ChatThread
+                    communityId={communityId}
+                    conversationId={kametiConv.id}
+                    title={conversationTitle(kametiConv)}
+                    memberCount={kametiConv.memberCount}
+                    type={kametiConv.type}
+                    messages={messages}
+                    loading={msgLoad}
+                    error={msgErr}
+                    currentUserId={user?.id}
+                    onSend={async (body) => {
+                      const ok = await sendMessage(body);
+                      if (ok) refetchMsg();
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Settings (kameti:manage) */}
+          {tab === 'settings' && (
+            <div className="bg-white rounded-2xl border border-line shadow-card p-5 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-ink mb-1.5">Group name</label>
+                <input
+                  type="text"
+                  value={nameDraft ?? report.group.name}
+                  onChange={(e) => setNameDraft(e.target.value)}
+                  maxLength={200}
+                  className="w-full px-3 py-2.5 text-sm bg-surface border border-line rounded-xl text-ink focus:bg-white focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/15"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-ink mb-1.5">Status</label>
+                <select
+                  value={statusDraft ?? report.group.status}
+                  onChange={(e) => setStatusDraft(e.target.value)}
+                  className="w-full px-3 py-2.5 text-sm bg-surface border border-line rounded-xl text-ink focus:bg-white focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/15"
+                >
+                  {['ACTIVE', 'COMPLETED', 'CANCELLED', 'PAUSED'].map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-muted mt-1.5">
+                  Contribution amount and frequency are fixed at creation to protect members.
+                </p>
+              </div>
+              <button
+                onClick={handleSaveSettings}
+                className="w-full py-2.5 text-sm font-bold text-white bg-primary-600 rounded-xl hover:bg-primary-700 transition-colors"
+              >
+                Save settings
+              </button>
+            </div>
           )}
         </div>
       )}
 
+      {/* Payout modal */}
       {payoutModal && report && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4 p-6">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-ink/40 backdrop-blur-[2px] animate-in" role="dialog" aria-modal="true" aria-label="Record payout">
+          <div className="relative w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-soft p-6 safe-bottom">
             {(() => {
               const period = report.periods.find((p) => p.id === payoutModal.periodId);
               const member = report.members.find((m) => m.id === payoutModal.memberId);
-              const contrib = getMemberContributionForPeriod(payoutModal.memberId, payoutModal.periodId);
+              const contrib = getContrib(payoutModal.memberId, payoutModal.periodId);
               return (
                 <>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-1">Record Payout</h3>
-                  <p className="text-sm text-gray-500 mb-4">
-                    Pay {member?.name || member?.email || 'Unknown'} for Period {period?.periodNumber}
+                  <h3 className="text-base font-bold text-ink">Record payout</h3>
+                  <p className="text-sm text-muted mt-1">
+                    Pay {member?.name || member?.email || 'member'} for Period {period?.periodNumber}
                   </p>
                   {contrib && (
-                    <div className="bg-gray-50 rounded-xl p-3 mb-4">
-                      <p className="text-xs text-gray-500">Member's contribution: ₹{contrib.amount} ({contrib.status})</p>
-                      {contrib.paymentMethod && <p className="text-xs text-gray-400">Method: {contrib.paymentMethod}</p>}
-                      {contrib.referenceNumber && <p className="text-xs text-gray-400">Ref: {contrib.referenceNumber}</p>}
+                    <div className="mt-3 bg-surface border border-line rounded-xl px-3 py-2.5">
+                      <p className="text-xs text-muted">
+                        Their contribution: ₹{contrib.amount} ({contrib.status})
+                        {contrib.referenceNumber ? ` · Ref ${contrib.referenceNumber}` : ''}
+                      </p>
                     </div>
                   )}
-                  <div className="space-y-3">
+                  <div className="mt-4 space-y-3">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Amount (₹)</label>
-                      <input type="number" value={payoutAmount} onChange={(e) => setPayoutAmount(e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-teal-500 outline-none" />
+                      <label className="block text-xs font-semibold text-ink mb-1.5">Amount (₹)</label>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={payoutAmount}
+                        onChange={(e) => setPayoutAmount(e.target.value)}
+                        className="w-full px-3 py-2.5 text-sm bg-surface border border-line rounded-xl text-ink focus:bg-white focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/15"
+                      />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Reference (optional)</label>
-                      <input value={payoutRef} onChange={(e) => setPayoutRef(e.target.value)} placeholder="UPI Ref #" className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-teal-500 outline-none" />
+                      <label className="block text-xs font-semibold text-ink mb-1.5">Reference (optional)</label>
+                      <input
+                        value={payoutRef}
+                        onChange={(e) => setPayoutRef(e.target.value)}
+                        placeholder="UPI ref / receipt no"
+                        maxLength={255}
+                        className="w-full px-3 py-2.5 text-sm bg-surface border border-line rounded-xl text-ink placeholder:text-muted focus:bg-white focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/15"
+                      />
                     </div>
                   </div>
-                  <div className="flex justify-end gap-3 mt-5">
-                    <button onClick={() => { setPayoutModal(null); setPayoutAmount(''); setPayoutRef(''); }} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200">Cancel</button>
-                    <Button onClick={handleMarkPayout} loading={mutating}>Confirm Payout</Button>
+                  <div className="flex gap-3 mt-6">
+                    <button
+                      onClick={() => {
+                        setPayoutModal(null);
+                        setPayoutAmount('');
+                        setPayoutRef('');
+                      }}
+                      className="flex-1 px-4 py-2.5 rounded-xl border border-line text-sm font-semibold text-ink hover:bg-surface transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleMarkPayout}
+                      className="flex-1 px-4 py-2.5 rounded-xl bg-primary-600 text-white text-sm font-semibold hover:bg-primary-700 transition-colors"
+                    >
+                      Confirm payout
+                    </button>
                   </div>
                 </>
               );
@@ -351,21 +635,46 @@ export default function KametiDetailPage() {
   );
 }
 
-function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
+function Tile({ label, value, sub, tint }: { label: string; value: string; sub: string; tint: string }) {
   return (
-    <div>
-      <p className="text-xs text-gray-500">{label}</p>
-      <p className="text-lg font-bold text-gray-900">{value}</p>
-      {sub && <p className="text-[10px] text-gray-400">{sub}</p>}
+    <div className={`rounded-xl p-3 ${tint}`}>
+      <p className="text-[10px] font-medium opacity-80">{label}</p>
+      <p className="text-lg font-bold leading-tight mt-0.5">{value}</p>
+      <p className="text-[10px] opacity-70">{sub}</p>
     </div>
   );
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+function InfoRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex justify-between">
-      <span className="text-gray-600">{label}</span>
-      <span className="font-medium text-gray-900">{value}</span>
+    <div className="flex justify-between text-sm">
+      <span className="text-muted">{label}</span>
+      <span className="font-medium text-ink">{value}</span>
     </div>
+  );
+}
+
+function PeriodStatusBadge({ status }: { status: string }) {
+  const styles: Record<string, string> = {
+    ACTIVE: 'bg-primary-50 text-primary-700',
+    COMPLETED: 'bg-emerald-50 text-emerald-700',
+    DEFAULTED: 'bg-red-50 text-red-600',
+    PENDING: 'bg-surface text-muted border border-line',
+  };
+  return (
+    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${styles[status] || styles.PENDING}`}>{status}</span>
+  );
+}
+
+function ContributionBadge({ status }: { status: string }) {
+  const styles: Record<string, string> = {
+    VERIFIED: 'bg-primary-50 text-primary-700',
+    PAID: 'bg-sky-50 text-sky-700',
+    PENDING: 'bg-gold-50 text-gold-700',
+    REJECTED: 'bg-red-50 text-red-600',
+    LATE: 'bg-orange-50 text-orange-600',
+  };
+  return (
+    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${styles[status] || 'bg-surface text-muted'}`}>{status}</span>
   );
 }

@@ -11,12 +11,48 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Barakah design tokens */
+  --barakah-bg: #f7f9f6;
+  --barakah-card: #ffffff;
+  --barakah-primary: #075b46;
+  --barakah-secondary: #0b8062;
+  --barakah-accent: #d6ae58;
+  --barakah-text: #202923;
+  --barakah-text-muted: #78837d;
+  --barakah-border: #e5ece7;
 }
 
 body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  background-color: var(--barakah-bg);
+  color: var(--barakah-text);
+}
+
+/* Subtle, professional scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: #cfdcd4;
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #b3c5ba;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Chat message area: fade scrollbar */
+.chat-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.chat-scroll::-webkit-scrollbar-thumb {
+  background: #dbe5de;
+  border-radius: 6px;
 }
 
 /* Motion utilities */

@@ -1,11 +1,11 @@
 {
-  "name": "Islamic Community Platform",
-  "short_name": "ICP",
+  "name": "Barakah — Islamic Community Platform",
+  "short_name": "Barakah",
   "description": "Connect, manage, and grow your community.",
   "start_url": "/app",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#16a34a",
+  "background_color": "#f7f9f6",
+  "theme_color": "#075b46",
   "orientation": "portrait-primary",
   "categories": ["community", "social", "finance"],
   "icons": [

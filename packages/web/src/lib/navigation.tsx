@@ -97,11 +97,13 @@ export const merchantNav: NavItem[] = [
 ];
 
 export const customerNav: NavItem[] = [
-  { label: 'Dashboard', path: '/app', icon: icons.dashboard },
+  { label: 'Home', path: '/app', icon: icons.dashboard },
+  { label: 'Community', path: '/app/community', icon: icons.community },
   { label: 'Marketplace', path: '/app/marketplace', icon: icons.shop },
   { label: 'My Orders', path: '/app/orders', icon: icons.orders },
   { label: 'Kameti', path: '/app/kameti', icon: icons.kameti },
   { label: 'Sadaqah', path: '/app/sadaqah', icon: icons.crowdfunding },
+  { label: 'Crowdfunding', path: '/app/projects', icon: icons.crowdfunding },
   { label: 'Finance', path: '/app/finance', icon: icons.finance },
   { label: 'Finance Requests', path: '/app/finance-requests', icon: icons.finance },
   { label: 'My Installments', path: '/app/bnpl', icon: icons.orders },
@@ -109,4 +111,5 @@ export const customerNav: NavItem[] = [
   { label: 'Zakat', path: '/app/zakat', icon: icons.zakat },
   { label: 'Messages', path: '/app/messages', icon: icons.messaging },
   { label: 'Profile', path: '/app/profile', icon: icons.profile },
+  { label: 'More', path: '/app/more', icon: icons.announcements },
 ];

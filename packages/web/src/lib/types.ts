@@ -247,9 +247,9 @@ export interface KametiMember {
 export interface KametiPeriod {
   id: string;
   periodNumber: number;
-  startDate: string;
-  endDate: string;
-  status: string;
+  /** Contribution due date for this period (YYYY-MM-DD). */
+  dueDate: string;
+  status: 'PENDING' | 'ACTIVE' | 'COMPLETED' | 'DEFAULTED';
 }
 
 export interface KametiContribution {
@@ -259,7 +259,7 @@ export interface KametiContribution {
   amount: string;
   paymentMethod?: string;
   referenceNumber?: string;
-  status: 'PAID' | 'VERIFIED' | 'PENDING';
+  status: 'PENDING' | 'PAID' | 'VERIFIED' | 'REJECTED' | 'LATE';
   createdAt: string;
 }
 
@@ -284,6 +284,8 @@ export interface Conversation {
   memberCount: number;
   lastMessage?: Message;
   otherMemberId?: string;
+  /** Server-computed unread messages for the current user (read-receipt based). */
+  unreadCount?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -296,6 +298,7 @@ export interface Message {
   body: string;
   messageType: 'TEXT' | 'IMAGE' | 'FILE';
   attachmentUrl?: string;
+  editedAt?: string | null;
   createdAt: string;
 }
 
