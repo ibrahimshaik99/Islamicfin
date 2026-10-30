@@ -234,7 +234,15 @@ All remain authenticated, authorized, tenant-scoped, and validated server-side.
   notifications, unread counts, the read route, the self-report route,
   period-generation fixes, and report-access gating with two communities
   (tenant isolation: Community A cannot read Community B's Kameti data).
-- Deployed: API worker + web (Pages).
+- Deployed: NOT YET DEPLOYED as of 2026-10-30. The production Worker
+  (`icp-api`, account `4bc03fdd…`) and Pages project (`icp-frontend`) reject
+  this machine's Cloudflare OAuth grant with `Authentication error 10000`
+  (account-level lockout/re-auth required in the dashboard; the grant can
+  only list account `faacd7ec…`, which contains no such resources). All code
+  is committed and pushed (`e116ec0`, `0a126d7`); the live site keeps running
+  the previous consistent version. Deployment resumes once dashboard access
+  to account `4bc03fdd…` is restored or an account-scoped API token is
+  provided.
 
 ---
 
