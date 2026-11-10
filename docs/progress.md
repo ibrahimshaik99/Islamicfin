@@ -234,19 +234,64 @@ All remain authenticated, authorized, tenant-scoped, and validated server-side.
   notifications, unread counts, the read route, the self-report route,
   period-generation fixes, and report-access gating with two communities
   (tenant isolation: Community A cannot read Community B's Kameti data).
-- Deployed: NOT YET DEPLOYED as of 2026-10-30. The production Worker
-  (`icp-api`, account `4bc03fdd…`) and Pages project (`icp-frontend`) reject
-  this machine's Cloudflare OAuth grant with `Authentication error 10000`
-  (account-level lockout/re-auth required in the dashboard; the grant can
-  only list account `faacd7ec…`, which contains no such resources). All code
-  is committed and pushed (`e116ec0`, `0a126d7`); the live site keeps running
-  the previous consistent version. Deployment resumes once dashboard access
-  to account `4bc03fdd…` is restored or an account-scoped API token is
-  provided.
+- Deployed: **DEPLOYED to production on 2026-11-10** using an account-scoped
+  API token (root `.env` → `CLOUDFLARE_API_TOKEN`, permissions documented in
+  `.env.example`) for account `4bc03fdd…`:
+  - Worker `icp-api` → https://icp-api.framewebpixel.workers.dev
+    (`wrangler deploy`; upload succeeded — wrangler 3.114.17 then exited 1 on
+    a post-upload telemetry `fetch failed`, verified non-fatal by live probe).
+  - Pages `icp-frontend` → https://icp-frontend.pages.dev
+    (`wrangler pages deploy dist --project-name=icp-frontend --branch=production`,
+    exit 0, live HTTP 200).
+  - The earlier `Authentication error 10000` was caused by a token created in
+    the wrong account; a token for the production account resolves it. The
+    machine's Cloudflare OAuth grant is still bound to the empty account
+    `faacd7ec…` — prefer the API token for deploys.
 
 ---
 
-## 8. Remaining Tasks (recommended next)
+## 8. City-Restricted Product Visibility (2026-11-10)
+
+Products are visible only in the marketplace of the city their merchant
+selected, by default:
+
+1. A product appears only in its merchant's selected city marketplace.
+2. A customer who selects that city discovers it.
+3. A customer in another city does not see it in their default local
+   marketplace (detail returns 404, indistinguishable from a missing product).
+
+### Design decisions
+
+- `merchants.city_id` (nullable FK → `cities`) drives visibility; migration
+  `0009_fearless_bulldozer` backfills each merchant from its community's city.
+- Customer reads default to `tenant.communityCityId` (the community's city);
+  `?cityId=` overrides after UUID validation (invalid → 400
+  `VALIDATION_ERROR`). Non-UUID `city` values on older links are ignored.
+- Management roles (merchant/community admin) are NOT implicitly city-scoped
+  for catalog management; scoping applies only when `cityId` is explicit.
+- Merchant apply sets `city_id` via server-side SQL subselect from the
+  community row (never client-supplied); `PATCH /merchants/my` accepts
+  `cityId` validated as an ACTIVE city (otherwise `CITY_NOT_AVAILABLE` 400).
+- No cross-community/city catalog aggregation: orders are community-scoped,
+  so cross-community purchase would be fake UI (documented in `docs/API.md`).
+
+### Verification
+
+- API tests: 435/435 passing (13 new: marketplace city suite, merchant
+  apply/PATCH city tests, tenant-isolation scenarios 14–15).
+- Web tests 4/4, typechecks (api+web) pass, lint 0 errors (15 pre-existing
+  warnings), api dry-run build + web production build pass.
+- Live production suite (14 checks) passed on 2026-11-10: 401 unauth,
+  logins, default/selected city lists, merchant city switch (default hides →
+  selected city shows → detail 404 vs 200 → admin catalog unaffected),
+  restore to Bhopal, invalid city 400, cross-tenant 403, final state restored.
+  One transient 500 observed on the first city switch during a concurrent
+  deploy; immediate retry returned 200 and the full cycle then passed —
+  worth watching under load (no reproduction since).
+
+---
+
+## 9. Remaining Tasks (recommended next)
 
 1. Message pagination ("load earlier") past the 200-message cap.
 2. R2-backed file upload endpoint for image messages; replace data URLs.
