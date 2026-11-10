@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useApi } from '../../lib/useApi';
 import { useCart } from '../../context/CartContext';
 import { LoadingState, ErrorState } from '../../components/ui';
-import type { Product, ProductCategory } from '../../lib/types';
+import type { City, Product, ProductCategory } from '../../lib/types';
 
 export default function MarketplacePage() {
   const navigate = useNavigate();
@@ -31,16 +31,35 @@ export default function MarketplacePage() {
     communityId ? `${prefix}/categories` : null,
   );
 
-  const { data: dash } = useApi<{ community: { name: string; city?: string | null; state?: string | null } }>(
-    communityId ? `${prefix}/dashboard` : null,
-  );
+  const { data: dash } = useApi<{
+    community: { name: string; cityId?: string | null; city?: string | null; state?: string | null };
+  }>(communityId ? `${prefix}/dashboard` : null);
   const communityLabel = dash?.community
     ? `${dash.community.name}${dash.community.city ? ` · ${dash.community.city}` : ''}`
     : null;
 
-  const productPath = selectedCategory
-    ? `${prefix}/products?categoryId=${selectedCategory}`
-    : `${prefix}/products`;
+  // ---- City marketplace selection ----
+  // Default marketplace = the customer's own community city (server-enforced).
+  // An explicit ?city= lets the customer deliberately browse another city.
+  const { data: cityList } = useApi<City[]>('/cities');
+  const cityParam = searchParams.get('city') ?? '';
+  const localCityId = dash?.community?.cityId ?? '';
+  const activeCityId = cityParam || localCityId;
+  const activeCity = (cityList || []).find((c) => c.id === activeCityId) ?? null;
+
+  const selectCity = (cityId: string) => {
+    const next = new URLSearchParams(searchParams);
+    if (!cityId || cityId === localCityId) next.delete('city');
+    else next.set('city', cityId);
+    setSearchParams(next);
+  };
+
+  const productPath =
+    `${prefix}/products${selectedCategory ? `?categoryId=${selectedCategory}` : ''}` +
+    (cityParam ? `${selectedCategory ? '&' : '?'}cityId=${cityParam}` : '');
+
+  const productLink = (productId: string) =>
+    `/app/products/${productId}${cityParam ? `?city=${encodeURIComponent(cityParam)}` : ''}`;
 
   const { data: productsData, loading, error } = useApi<Product[]>(
     communityId ? productPath : null,
@@ -101,6 +120,35 @@ export default function MarketplacePage() {
           </div>
         </div>
 
+        {/* City marketplace */}
+        <div className="px-4 pb-3 flex gap-2 overflow-x-auto hide-scrollbar" role="group" aria-label="City marketplace">
+          <button
+            onClick={() => selectCity('')}
+            aria-pressed={!cityParam}
+            className={`flex-shrink-0 px-4 py-2 rounded-full text-xs font-semibold transition-all ${
+              !cityParam ? 'bg-white text-orange-600 shadow-sm' : 'bg-white/15 text-white/80 hover:bg-white/25'
+            }`}
+          >
+            📍 My city{dash?.community?.city ? ` · ${dash.community.city}` : ''}
+          </button>
+          {(cityList || [])
+            .filter((city) => city.id !== localCityId)
+            .map((city) => (
+              <button
+                key={city.id}
+                onClick={() => selectCity(city.id)}
+                aria-pressed={cityParam === city.id}
+                className={`flex-shrink-0 px-4 py-2 rounded-full text-xs font-semibold transition-all ${
+                  cityParam === city.id
+                    ? 'bg-white text-orange-600 shadow-sm'
+                    : 'bg-white/15 text-white/80 hover:bg-white/25'
+                }`}
+              >
+                {city.name}
+              </button>
+            ))}
+        </div>
+
         {/* Categories */}
         {(categories || []).length > 0 && (
           <div className="px-4 pb-4 flex gap-2 overflow-x-auto hide-scrollbar">
@@ -136,15 +184,21 @@ export default function MarketplacePage() {
             <div className="w-20 h-20 rounded-full bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center mx-auto mb-4">
               <span className="text-4xl">📦</span>
             </div>
-            <p className="text-sm font-medium text-gray-600">No products found</p>
-            <p className="text-xs text-gray-400 mt-1">Try adjusting your search or category</p>
+            <p className="text-sm font-medium text-gray-600">
+              No products in {activeCity ? activeCity.name : 'this marketplace'} yet
+            </p>
+            <p className="text-xs text-gray-400 mt-1">
+              {cityParam
+                ? 'Pick another city, or switch back to My city'
+                : 'Try adjusting your search or category'}
+            </p>
           </div>
         )}
         {!loading && !error && (
           <div className="grid grid-cols-2 gap-3 animate-in fade-in slide-in-from-bottom-4">
             {products.map((product, i) => (
               <div key={product.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-all group" style={{ animationDelay: `${i * 30}ms` }}>
-                <Link to={`/app/products/${product.id}`}>
+                <Link to={productLink(product.id)}>
                   <div className="aspect-square bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center overflow-hidden">
                     {product.images?.[0]?.url ? (
                       <img src={product.images[0].url} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
@@ -154,7 +208,7 @@ export default function MarketplacePage() {
                   </div>
                 </Link>
                 <div className="p-3">
-                  <Link to={`/app/products/${product.id}`}>
+                  <Link to={productLink(product.id)}>
                     <h3 className="text-sm font-medium text-gray-900 line-clamp-2 leading-tight">{product.name}</h3>
                   </Link>
                   <div className="flex items-center gap-1.5 mt-2">

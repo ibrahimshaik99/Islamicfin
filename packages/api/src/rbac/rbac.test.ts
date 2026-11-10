@@ -228,6 +228,7 @@ describe('RBAC Authorization Tests — Correct Tenant + Correct Role', () => {
       communityId: TEST_COMMUNITIES.communityA.id,
       role: 'COMMUNITY_OWNER',
       membershipId: 'mem-1',
+      communityCityId: null,
     });
 
     const res = await app.request(
@@ -244,6 +245,7 @@ describe('RBAC Authorization Tests — Correct Tenant + Correct Role', () => {
       communityId: TEST_COMMUNITIES.communityA.id,
       role: 'MERCHANT',
       membershipId: 'mem-2',
+      communityCityId: null,
     });
 
     const res = await app.request(
@@ -260,6 +262,7 @@ describe('RBAC Authorization Tests — Correct Tenant + Correct Role', () => {
       communityId: TEST_COMMUNITIES.communityA.id,
       role: 'COMMUNITY_FINANCE_MANAGER',
       membershipId: 'mem-3',
+      communityCityId: null,
     });
 
     const res = await app.request(
@@ -276,6 +279,7 @@ describe('RBAC Authorization Tests — Correct Tenant + Correct Role', () => {
       communityId: TEST_COMMUNITIES.communityA.id,
       role: 'COMMUNITY_ADMIN',
       membershipId: 'mem-4',
+      communityCityId: null,
     });
 
     const res = await app.request(
@@ -359,6 +363,7 @@ describe('RBAC Authorization Tests — Correct Tenant + Incorrect Role', () => {
       communityId: TEST_COMMUNITIES.communityA.id,
       role: 'CUSTOMER',
       membershipId: 'mem-5',
+      communityCityId: null,
     });
 
     const res = await app.request(
@@ -377,6 +382,7 @@ describe('RBAC Authorization Tests — Correct Tenant + Incorrect Role', () => {
       communityId: TEST_COMMUNITIES.communityA.id,
       role: 'MERCHANT',
       membershipId: 'mem-6',
+      communityCityId: null,
     });
 
     const res = await app.request(
@@ -393,6 +399,7 @@ describe('RBAC Authorization Tests — Correct Tenant + Incorrect Role', () => {
       communityId: TEST_COMMUNITIES.communityA.id,
       role: 'MERCHANT',
       membershipId: 'mem-7',
+      communityCityId: null,
     });
 
     const res = await app.request(
@@ -409,6 +416,7 @@ describe('RBAC Authorization Tests — Correct Tenant + Incorrect Role', () => {
       communityId: TEST_COMMUNITIES.communityA.id,
       role: 'COMMUNITY_MODERATOR',
       membershipId: 'mem-8',
+      communityCityId: null,
     });
 
     const res = await app.request(
@@ -425,6 +433,7 @@ describe('RBAC Authorization Tests — Correct Tenant + Incorrect Role', () => {
       communityId: TEST_COMMUNITIES.communityA.id,
       role: 'COMMUNITY_FINANCE_MANAGER',
       membershipId: 'mem-9',
+      communityCityId: null,
     });
 
     const res = await app.request(
@@ -441,6 +450,7 @@ describe('RBAC Authorization Tests — Correct Tenant + Incorrect Role', () => {
       communityId: TEST_COMMUNITIES.communityA.id,
       role: 'MERCHANT_STAFF',
       membershipId: 'mem-10',
+      communityCityId: null,
     });
 
     const res = await app.request(
@@ -457,6 +467,7 @@ describe('RBAC Authorization Tests — Correct Tenant + Incorrect Role', () => {
       communityId: TEST_COMMUNITIES.communityA.id,
       role: 'CUSTOMER',
       membershipId: 'mem-11',
+      communityCityId: null,
     });
 
     const res = await app.request(
@@ -515,6 +526,7 @@ describe('RBAC Authorization Tests — Wrong Tenant + Correct-Looking Role', () 
           communityId,
           role: 'COMMUNITY_OWNER',
           membershipId: 'mem-owner-a',
+          communityCityId: null,
         };
       }
       return null;

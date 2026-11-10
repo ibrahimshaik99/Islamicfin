@@ -64,6 +64,13 @@
       "when": 1790509253706,
       "tag": "0008_lyrical_brood",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1794314529880,
+      "tag": "0009_fearless_bulldozer",
+      "breakpoints": true
     }
   ]
 }

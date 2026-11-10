@@ -173,6 +173,37 @@ describe('Merchant Onboarding Integration Tests', () => {
       expect(res.status).toBe(201);
     });
 
+    it('POST /api/v1/communities/:id/merchants/apply publishes to the community city marketplace by default', async () => {
+      mockDb.select.mockReturnValue({
+        from: vi.fn().mockReturnThis(),
+        where: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockReturnValue({
+          then: (resolve: (v: unknown) => void) => resolve([]),
+        }),
+      });
+      const insertChain = mockInsertChain([{ id: MERCHANT_ID, businessName: 'Test Shop' }]);
+      mockDb.insert.mockReturnValue(insertChain);
+      mockDb.update.mockReturnValue(mockUpdateChain([{ id: USER_A, role: 'MERCHANT' }]));
+
+      const res = await app.request(
+        `http://localhost/api/v1/communities/${COMMUNITY_A}/merchants/apply`,
+        {
+          method: 'POST',
+          headers: { cookie: createCookie('customer-session'), 'Content-Type': 'application/json' },
+          body: JSON.stringify({ businessName: 'Test Shop' }),
+        },
+        { ENVIRONMENT: 'test' },
+      );
+      expect(res.status).toBe(201);
+
+      // The city is derived from the community row server-side — the client
+      // never supplies it — so listings default to the local city marketplace.
+      const payload = insertChain.values.mock.calls[0]?.[0] as Record<string, unknown>;
+      expect(payload).toBeDefined();
+      expect(payload.cityId).toBeDefined();
+      expect(JSON.stringify(payload.cityId)).toContain('city_id');
+    });
+
     it('POST /api/v1/communities/:id/merchants/apply returns 409 if already applied', async () => {
       mockDb.select.mockReturnValue({
         from: vi.fn().mockReturnThis(),
@@ -547,6 +578,113 @@ describe('Merchant Onboarding Integration Tests', () => {
         { ENVIRONMENT: 'test' },
       );
       expect(res.status).toBe(403);
+    });
+
+    it('PATCH /api/v1/communities/:id/merchants/my moves listings to an active city marketplace', async () => {
+      const CITY_ID = '00000000-0000-0000-0000-000000000c99';
+      let call = 0;
+      mockDb.select.mockImplementation(() => {
+        call++;
+        const rows =
+          call === 1
+            ? [{ id: MERCHANT_ID, verificationStatus: 'APPROVED' }]
+            : [{ id: CITY_ID, status: 'ACTIVE' }];
+        return {
+          from: vi.fn().mockReturnThis(),
+          where: vi.fn().mockReturnThis(),
+          limit: vi.fn().mockReturnValue({
+            then: (resolve: (v: unknown) => void) => resolve(rows),
+          }),
+        };
+      });
+      mockDb.update.mockReturnValue(mockUpdateChain([{ id: MERCHANT_ID, cityId: CITY_ID }]));
+
+      const res = await app.request(
+        `http://localhost/api/v1/communities/${COMMUNITY_A}/merchants/my`,
+        {
+          method: 'PATCH',
+          headers: { cookie: createCookie('merchant-session'), 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cityId: CITY_ID }),
+        },
+        { ENVIRONMENT: 'test' },
+      );
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { data: { cityId?: string } };
+      expect(body.data.cityId).toBe(CITY_ID);
+    });
+
+    it('PATCH /api/v1/communities/:id/merchants/my rejects an unknown city marketplace', async () => {
+      let call = 0;
+      mockDb.select.mockImplementation(() => {
+        call++;
+        const rows = call === 1 ? [{ id: MERCHANT_ID, verificationStatus: 'APPROVED' }] : [];
+        return {
+          from: vi.fn().mockReturnThis(),
+          where: vi.fn().mockReturnThis(),
+          limit: vi.fn().mockReturnValue({
+            then: (resolve: (v: unknown) => void) => resolve(rows),
+          }),
+        };
+      });
+
+      const res = await app.request(
+        `http://localhost/api/v1/communities/${COMMUNITY_A}/merchants/my`,
+        {
+          method: 'PATCH',
+          headers: { cookie: createCookie('merchant-session'), 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cityId: '00000000-0000-0000-0000-000000000c88' }),
+        },
+        { ENVIRONMENT: 'test' },
+      );
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as { error: { code: string } };
+      expect(body.error.code).toBe('CITY_NOT_AVAILABLE');
+    });
+
+    it('PATCH /api/v1/communities/:id/merchants/my rejects a disabled city marketplace', async () => {
+      let call = 0;
+      mockDb.select.mockImplementation(() => {
+        call++;
+        const rows =
+          call === 1
+            ? [{ id: MERCHANT_ID, verificationStatus: 'APPROVED' }]
+            : [{ id: '00000000-0000-0000-0000-000000000c88', status: 'DISABLED' }];
+        return {
+          from: vi.fn().mockReturnThis(),
+          where: vi.fn().mockReturnThis(),
+          limit: vi.fn().mockReturnValue({
+            then: (resolve: (v: unknown) => void) => resolve(rows),
+          }),
+        };
+      });
+
+      const res = await app.request(
+        `http://localhost/api/v1/communities/${COMMUNITY_A}/merchants/my`,
+        {
+          method: 'PATCH',
+          headers: { cookie: createCookie('merchant-session'), 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cityId: '00000000-0000-0000-0000-000000000c88' }),
+        },
+        { ENVIRONMENT: 'test' },
+      );
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as { error: { code: string } };
+      expect(body.error.code).toBe('CITY_NOT_AVAILABLE');
+    });
+
+    it('PATCH /api/v1/communities/:id/merchants/my rejects a malformed cityId', async () => {
+      const res = await app.request(
+        `http://localhost/api/v1/communities/${COMMUNITY_A}/merchants/my`,
+        {
+          method: 'PATCH',
+          headers: { cookie: createCookie('merchant-session'), 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cityId: 'not-a-uuid' }),
+        },
+        { ENVIRONMENT: 'test' },
+      );
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as { error: { code: string } };
+      expect(body.error.code).toBe('VALIDATION_ERROR');
     });
   });
 

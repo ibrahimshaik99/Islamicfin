@@ -14,6 +14,7 @@ export interface MembershipResult {
   communityName: string;
   communitySlug: string;
   communityStatus: string;
+  communityCityId: string | null;
 }
 
 export async function getMembership(
@@ -30,6 +31,7 @@ export async function getMembership(
       communityName: communities.name,
       communitySlug: communities.slug,
       communityStatus: communities.status,
+      communityCityId: communities.cityId,
     })
     .from(communityMemberships)
     .innerJoin(
@@ -60,6 +62,7 @@ export async function getUserMemberships(
       communityName: communities.name,
       communitySlug: communities.slug,
       communityStatus: communities.status,
+      communityCityId: communities.cityId,
     })
     .from(communityMemberships)
     .innerJoin(
@@ -92,5 +95,6 @@ export async function resolveTenantContext(
     communityId,
     role: membership.role,
     membershipId: membership.membershipId,
+    communityCityId: membership.communityCityId ?? null,
   };
 }

@@ -7,6 +7,7 @@ import {
   pgEnum,
   index,
 } from 'drizzle-orm/pg-core';
+import { cities } from './cities';
 import { communities } from './communities';
 import { users } from './users';
 
@@ -34,6 +35,9 @@ export const merchants = pgTable(
     upiId: varchar('upi_id', { length: 255 }),
     upiQrUrl: text('upi_qr_url'),
     address: text('address'),
+    // City marketplace this merchant publishes to. Products are discoverable
+    // only in the selected city's marketplace (defaults to the community city).
+    cityId: uuid('city_id').references(() => cities.id, { onDelete: 'set null' }),
     verificationStatus: merchantVerificationStatusEnum('verification_status')
       .notNull()
       .default('PENDING'),
@@ -44,5 +48,6 @@ export const merchants = pgTable(
     merchants_community_id_idx: index('merchants_community_id_idx').on(table.communityId),
     merchants_user_id_idx: index('merchants_user_id_idx').on(table.userId),
     merchants_verification_status_idx: index('merchants_verification_status_idx').on(table.verificationStatus),
+    merchants_city_id_idx: index('merchants_city_id_idx').on(table.cityId),
   }),
 );

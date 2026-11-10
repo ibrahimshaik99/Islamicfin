@@ -2,26 +2,46 @@ import { useState } from 'react';
 import { DashboardLayout } from '../../components/DashboardLayout';
 import { communityNav } from '../../lib/navigation';
 import { useAuth } from '../../context/AuthContext';
+import { useApi } from '../../lib/useApi';
 import { LoadingState, ErrorState, Card, CardContent } from '../../components/ui';
 import { useAdminList, DataTable, Pagination, SearchInput } from '../../components/admin/AdminComponents';
+import type { City } from '../../lib/types';
 
 export default function MarketplacePage() {
   const { communityId } = useAuth();
   const prefix = communityId ? `/communities/${communityId}` : '';
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
+  const [cityFilter, setCityFilter] = useState('');
+
+  const { data: dash } = useApi<{ community: { city?: string | null; state?: string | null } }>(
+    communityId ? `${prefix}/dashboard` : null,
+  );
+  const { data: cities } = useApi<City[]>('/cities');
 
   const { data, pagination, loading, error, refetch, setPage, setFilters, setSearch: setServerSearch } = useAdminList<Record<string, unknown>>({
     path: `${prefix}/products`,
     limit: 20,
-    filters: categoryFilter ? { category: categoryFilter } : {},
+    filters: {},
   });
+
+  const applyFilters = (category: string, cityId: string) => {
+    const next: Record<string, string> = {};
+    if (category) next.category = category;
+    if (cityId) next.cityId = cityId;
+    setFilters(next);
+  };
 
   const handleSearch = (v: string) => { setSearch(v); setServerSearch(v); };
 
   const handleCategoryChange = (value: string) => {
     setCategoryFilter(value);
-    setFilters(value ? { category: value } : {});
+    applyFilters(value, cityFilter);
+  };
+
+  const handleCityChange = (value: string) => {
+    setCityFilter(value);
+    applyFilters(categoryFilter, value);
   };
 
   const columns = [
@@ -69,10 +89,28 @@ export default function MarketplacePage() {
       {error && <ErrorState message={error} onRetry={refetch} />}
       {!loading && !error && (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="bg-primary-50 border border-primary-100 rounded-xl p-4">
+            <p className="text-sm font-semibold text-primary-800">
+              City marketplace: {dash?.community?.city ? `${dash.community.city}${dash.community.state ? `, ${dash.community.state}` : ''}` : 'not set'}
+            </p>
+            <p className="text-xs text-primary-700/90 mt-1">
+              Customers browse products by city. Each merchant picks their marketplace city in
+              Merchant → Settings, and their products are listed only there — customers in other
+              cities never see them in their default local marketplace. You see the full catalog here
+              and can filter it by city.
+            </p>
+          </div>
+
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-gray-900">Community Marketplace ({data.length} products)</h2>
             <div className="flex items-center gap-3">
               <SearchInput value={search} onChange={handleSearch} placeholder="Search products..." />
+              <select value={cityFilter} onChange={(e) => handleCityChange(e.target.value)} aria-label="Filter by city marketplace" className="text-sm border border-gray-300 rounded-lg px-3 py-2">
+                <option value="">All cities</option>
+                {(cities || []).map((city) => (
+                  <option key={city.id} value={city.id}>{city.name}</option>
+                ))}
+              </select>
               <select value={categoryFilter} onChange={(e) => handleCategoryChange(e.target.value)} className="text-sm border border-gray-300 rounded-lg px-3 py-2">
                 <option value="">All Categories</option>
                 <option value="FOOD">Food</option>

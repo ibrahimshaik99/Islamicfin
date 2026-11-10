@@ -15,6 +15,59 @@ import { requirePermission } from '../rbac/middleware';
 
 const marketplaceRoutes = new Hono();
 
+/**
+ * City marketplace scope for a single product.
+ *
+ * Every product is published to exactly one city marketplace: the city its
+ * merchant selected (`merchants.city_id`). The correlated subquery keeps the
+ * product list a single database round-trip and the exact same predicate is
+ * reused for the total count, so listings and counts can never disagree.
+ */
+function merchantCityScope(cityId: string) {
+  return sql`exists (
+    select 1 from "merchants"
+    where "merchants"."id" = ${products.merchantId}
+      and "merchants"."city_id" = ${cityId}
+  )`;
+}
+
+/**
+ * Resolves which city marketplace a read request is scoped to.
+ *
+ * - `?cityId=` (validated UUID) always wins, so a customer can deliberately
+ *   browse another city's marketplace and discover merchants there.
+ * - Without it, customers default to their community's city — their default
+ *   local marketplace — so another city's products are never listed by default.
+ * - Merchants and community staff manage the whole catalog, so they are only
+ *   city-scoped when they ask for it explicitly.
+ */
+function resolveCityScope(
+  c: { req: { query: (key: string) => string | undefined } },
+  tenant: { role: string; communityCityId: string | null },
+): { cityId: string | null; invalid: boolean } {
+  const requested = c.req.query('cityId');
+
+  if (requested !== undefined && requested !== '') {
+    const parsed = z.string().uuid().safeParse(requested);
+    return parsed.success
+      ? { cityId: parsed.data, invalid: false }
+      : { cityId: null, invalid: true };
+  }
+
+  if (tenant.role === 'CUSTOMER' && tenant.communityCityId) {
+    return { cityId: tenant.communityCityId, invalid: false };
+  }
+
+  return { cityId: null, invalid: false };
+}
+
+const INVALID_CITY_ID = {
+  error: {
+    code: 'VALIDATION_ERROR',
+    message: 'cityId must be a valid city UUID.',
+  },
+} as const;
+
 // ──────────────────────────────────────────
 // Category Routes
 // ──────────────────────────────────────────
@@ -205,6 +258,16 @@ marketplaceRoutes.get(
       conditions.push(sql`${products.price} <= ${maxPrice}`);
     }
 
+    // City visibility: products are listed only in the merchant's selected
+    // city marketplace (customers default to their own community city).
+    const cityScope = resolveCityScope(c, tenant);
+    if (cityScope.invalid) {
+      return c.json(INVALID_CITY_ID, 400);
+    }
+    if (cityScope.cityId) {
+      conditions.push(merchantCityScope(cityScope.cityId));
+    }
+
     // Auto-scope: merchants see only their own products
     if (tenant.role === 'MERCHANT' || tenant.role === 'MERCHANT_STAFF') {
       const [merchantProfile] = await db
@@ -294,15 +357,22 @@ marketplaceRoutes.get(
     const communityId = tenant.communityId;
     const { productId } = c.req.param();
 
+    // Same city rule as the list: a direct link must not expose a product
+    // from a marketplace the requester is not currently browsing.
+    const cityScope = resolveCityScope(c, tenant);
+    if (cityScope.invalid) {
+      return c.json(INVALID_CITY_ID, 400);
+    }
+
+    const conditions = [eq(products.id, productId), eq(products.communityId, communityId)];
+    if (cityScope.cityId) {
+      conditions.push(merchantCityScope(cityScope.cityId));
+    }
+
     const [product] = await db
       .select()
       .from(products)
-      .where(
-        and(
-          eq(products.id, productId),
-          eq(products.communityId, communityId),
-        ),
-      )
+      .where(and(...conditions))
       .limit(1);
 
     if (!product) {

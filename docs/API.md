@@ -136,6 +136,36 @@ Merchants may modify only their own products.
 
 Community administrators may manage marketplace records according to permissions.
 
+### City marketplace visibility
+
+Every product is published to exactly one city marketplace: the city its
+merchant selected (`merchants.city_id`). The server enforces this on reads:
+
+```text
+GET    /products?cityId=<city-uuid>   # browse a specific city marketplace
+GET    /products/:id?cityId=<city-uuid>
+```
+
+Rules:
+
+* `cityId` must be a valid UUID or the request fails with `VALIDATION_ERROR` (400).
+* Without `cityId`, a `CUSTOMER` is scoped to their own community's city —
+  their **default local marketplace** — so another city's products are never listed.
+* Without `cityId`, merchants and community staff see the whole catalog
+  (management views are only city-scoped when they ask for it explicitly).
+* A product detail request outside the scoped city returns `404`, exactly like
+  a missing product, so city-scoped products cannot be probed by id.
+
+Merchant city selection:
+
+```text
+PATCH  /communities/:communityId/merchants/my   { "cityId": "<city-uuid>" }
+```
+
+The city must exist and be `ACTIVE` (`CITY_NOT_AVAILABLE`, 400 otherwise).
+New merchants default to their community's city (set server-side, never
+supplied by the client).
+
 ---
 
 # 9. Cart

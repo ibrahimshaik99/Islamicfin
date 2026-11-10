@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useApi } from '../../lib/useApi';
 import { useCart } from '../../context/CartContext';
@@ -15,11 +15,24 @@ export default function ProductDetailPage() {
   const [quantity, setQuantity] = useState(1);
   const [added, setAdded] = useState(false);
 
+  // City marketplace the customer arrived from (?city=); without it the
+  // server applies their default local marketplace.
+  const [searchParams] = useSearchParams();
+  const cityParam = searchParams.get('city') ?? '';
+
   const { data, loading, error } = useApi<Product>(
-    communityId && productId ? `${prefix}/products/${productId}` : null,
+    communityId && productId
+      ? `${prefix}/products/${productId}${cityParam ? `?cityId=${encodeURIComponent(cityParam)}` : ''}`
+      : null,
   );
 
   const product = data;
+  // A product from another city marketplace is hidden by the server, which is
+  // reported as not-found — explain it instead of showing a bare 404.
+  const errorMessage =
+    error && cityParam && error.toLowerCase().includes('not found')
+      ? 'This product is not available in the selected city marketplace.'
+      : error;
 
   const handleAdd = () => {
     if (!product) return;
@@ -54,7 +67,7 @@ export default function ProductDetailPage() {
       {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto overscroll-contain">
         {loading && <div className="p-8"><LoadingState /></div>}
-        {error && <div className="p-4"><ErrorState message={error} /></div>}
+        {error && <div className="p-4"><ErrorState message={errorMessage ?? undefined} /></div>}
 
         {product && (
           <div className="animate-in fade-in">

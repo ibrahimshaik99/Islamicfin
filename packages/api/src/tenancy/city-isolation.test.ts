@@ -419,4 +419,48 @@ describe('City-based tenant isolation (Community A / Bhopal vs Community B / Ind
 
     expect(res.status).toBe(401);
   });
+
+  it('Scenario 14: a customer product list defaults to their own city marketplace', async () => {
+    // User A is a plain customer of Community A (City A). The default local
+    // marketplace must carry a City A predicate so another city's listings can
+    // never be returned by accident.
+    mockResolveTenantContext.mockResolvedValue({
+      userId: USER_A,
+      communityId: COMMUNITY_A,
+      role: 'CUSTOMER',
+      membershipId: 'mem-a',
+      communityCityId: CITY_A,
+    });
+    mockDb.__setQueue([[], []]);
+
+    const res = await app.request(
+      `http://localhost/api/v1/communities/${COMMUNITY_A}/products`,
+      { headers: { cookie: cookie() } },
+      { ENVIRONMENT: 'test' },
+    );
+
+    expect(res.status).toBe(200);
+    expect(containsValue(recordedWheres, CITY_A)).toBe(true);
+  });
+
+  it('Scenario 15: selecting another city switches the scope and drops the local city filter', async () => {
+    mockResolveTenantContext.mockResolvedValue({
+      userId: USER_A,
+      communityId: COMMUNITY_A,
+      role: 'CUSTOMER',
+      membershipId: 'mem-a',
+      communityCityId: CITY_A,
+    });
+    mockDb.__setQueue([[], []]);
+
+    const res = await app.request(
+      `http://localhost/api/v1/communities/${COMMUNITY_A}/products?cityId=${CITY_B}`,
+      { headers: { cookie: cookie() } },
+      { ENVIRONMENT: 'test' },
+    );
+
+    expect(res.status).toBe(200);
+    expect(containsValue(recordedWheres, CITY_B)).toBe(true);
+    expect(containsValue(recordedWheres, CITY_A)).toBe(false);
+  });
 });

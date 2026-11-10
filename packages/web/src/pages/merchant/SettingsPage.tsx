@@ -2,16 +2,18 @@ import { useState, useEffect } from 'react';
 import { DashboardLayout } from '../../components/DashboardLayout';
 import { merchantNav } from '../../lib/navigation';
 import { useAuth } from '../../context/AuthContext';
-import { useMutation } from '../../lib/useApi';
+import { useApi, useMutation } from '../../lib/useApi';
 import { useMerchantProfile } from '../../lib/useMerchantProfile';
 import { LoadingState, ErrorState, Button, Input, Card, CardContent } from '../../components/ui';
+import type { City } from '../../lib/types';
 
 export default function MerchantSettingsPage() {
   const { communityId } = useAuth();
   const prefix = communityId ? `/communities/${communityId}` : '';
 
   const { merchant, loading, error, refetch } = useMerchantProfile();
-  const { mutate, loading: mutating } = useMutation();
+  const { mutate, loading: mutating, error: saveError } = useMutation();
+  const { data: cities } = useApi<City[]>('/cities');
 
   const isSuspended = merchant?.verificationStatus === 'SUSPENDED';
 
@@ -22,6 +24,7 @@ export default function MerchantSettingsPage() {
     whatsapp: '',
     address: '',
     upiId: '',
+    cityId: '',
   });
 
   useEffect(() => {
@@ -33,14 +36,20 @@ export default function MerchantSettingsPage() {
         whatsapp: merchant.whatsapp || '',
         address: merchant.address || '',
         upiId: merchant.upiId || '',
+        cityId: merchant.cityId || '',
       });
     }
   }, [merchant]);
 
   const handleSave = async () => {
-    const result = await mutate(`${prefix}/merchants/my`, { method: 'PATCH', body: form });
+    const body: Record<string, string> = { ...form };
+    // Empty means "no city chosen" — omit it so the server never validates ''.
+    if (!body.cityId) delete body.cityId;
+    const result = await mutate(`${prefix}/merchants/my`, { method: 'PATCH', body });
     if (result) refetch();
   };
+
+  const selectedCity = (cities || []).find((city) => city.id === form.cityId) ?? null;
 
   const verificationBadge = (status: string) => {
     const map: Record<string, { bg: string; text: string; label: string }> = {
@@ -147,6 +156,28 @@ export default function MerchantSettingsPage() {
                   disabled={isSuspended}
                 />
 
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Marketplace city</label>
+                  <select
+                    value={form.cityId}
+                    onChange={(e) => setForm({ ...form, cityId: e.target.value })}
+                    disabled={isSuspended || (cities || []).length === 0}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-colors disabled:bg-gray-50 disabled:text-gray-500"
+                  >
+                    <option value="">Choose a city...</option>
+                    {(cities || []).map((city) => (
+                      <option key={city.id} value={city.id}>
+                        {city.name}, {city.state}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1.5 text-xs text-gray-500">
+                    {selectedCity
+                      ? `Only customers browsing the ${selectedCity.name} marketplace can discover your products. Customers in other cities never see them by default.`
+                      : 'No city selected — your products will not appear in any city marketplace until you choose one.'}
+                  </p>
+                </div>
+
                 <Input
                   label="UPI ID"
                   value={form.upiId}
@@ -155,7 +186,12 @@ export default function MerchantSettingsPage() {
                   disabled={isSuspended}
                 />
 
-                <div className="flex justify-end pt-4 border-t border-gray-100">
+                <div className="flex justify-end pt-4 border-t border-gray-100 gap-3">
+                  {saveError && (
+                    <p role="alert" className="mr-auto self-center text-sm font-medium text-red-600">
+                      {saveError}
+                    </p>
+                  )}
                   <Button onClick={handleSave} loading={mutating} disabled={isSuspended}>
                     Save Settings
                   </Button>

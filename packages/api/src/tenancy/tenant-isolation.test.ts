@@ -168,6 +168,7 @@ describe('Tenant Isolation Security Tests', () => {
         communityId: TEST_COMMUNITIES.communityA.id,
         role: TEST_MEMBERSHIPS.userAinA.role,
         membershipId: TEST_MEMBERSHIPS.userAinA.id,
+        communityCityId: null,
       });
 
       const res = await app.request(
@@ -208,6 +209,7 @@ describe('Tenant Isolation Security Tests', () => {
         communityId: TEST_COMMUNITIES.communityB.id,
         role: TEST_MEMBERSHIPS.userBinB.role,
         membershipId: TEST_MEMBERSHIPS.userBinB.id,
+        communityCityId: null,
       });
 
       const res = await app.request(
@@ -253,6 +255,7 @@ describe('Tenant Isolation Security Tests', () => {
             communityId,
             role: 'COMMUNITY_OWNER',
             membershipId: 'mem-1',
+            communityCityId: null,
           };
         }
         return null;
@@ -301,6 +304,7 @@ describe('Tenant Isolation Security Tests', () => {
             communityId,
             role: 'COMMUNITY_OWNER',
             membershipId: 'mem-1',
+            communityCityId: null,
           };
         }
         return null;
@@ -340,6 +344,7 @@ describe('Tenant Isolation Security Tests', () => {
             communityId,
             role: 'COMMUNITY_OWNER',
             membershipId: 'mem-1',
+            communityCityId: null,
           };
         }
         return null;

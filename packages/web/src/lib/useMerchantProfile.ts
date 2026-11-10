@@ -13,6 +13,8 @@ export interface MerchantProfile {
   address: string | null;
   upiId: string | null;
   upiQrUrl: string | null;
+  /** City marketplace this merchant publishes to. */
+  cityId: string | null;
   verificationStatus: 'PENDING' | 'APPROVED' | 'REJECTED' | 'SUSPENDED';
   createdAt: string;
   updatedAt: string;

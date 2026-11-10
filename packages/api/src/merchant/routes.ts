@@ -1,7 +1,8 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { and, eq, count, desc } from 'drizzle-orm';
+import { and, eq, count, desc, sql } from 'drizzle-orm';
 import { db } from '../db';
+import { cities } from '../db/schema/cities';
 import { merchants } from '../db/schema/merchants';
 import { communityMemberships } from '../db/schema/communities';
 import { auditLogs } from '../db/schema/audit';
@@ -73,6 +74,9 @@ merchantRoutes.post(
         address: result.data.address,
         upiId: result.data.upiId,
         upiQrUrl: result.data.upiQrUrl,
+        // Publish to the community's city marketplace by default; the merchant
+        // can switch city later from merchant settings.
+        cityId: sql`(select "city_id" from "communities" where "communities"."id" = ${communityId})`,
         verificationStatus: 'PENDING',
       })
       .returning();
@@ -202,6 +206,8 @@ const updateProfileSchema = z.object({
   address: z.string().optional(),
   upiId: z.string().max(255).optional(),
   upiQrUrl: z.string().optional(),
+  // City marketplace the merchant publishes to (products are only listed there).
+  cityId: z.string().uuid().optional(),
 });
 
 merchantRoutes.patch(
@@ -247,6 +253,28 @@ merchantRoutes.patch(
         { error: { code: 'SUSPENDED', message: 'Suspended merchants cannot update their profile.' } },
         403,
       );
+    }
+
+    // Changing the city marketplace moves every listing this merchant owns to
+    // that city, so the target city must exist and be active.
+    if (result.data.cityId !== undefined) {
+      const [city] = await db
+        .select({ id: cities.id, status: cities.status })
+        .from(cities)
+        .where(eq(cities.id, result.data.cityId))
+        .limit(1);
+
+      if (!city || city.status !== 'ACTIVE') {
+        return c.json(
+          {
+            error: {
+              code: 'CITY_NOT_AVAILABLE',
+              message: 'Select an active city marketplace.',
+            },
+          },
+          400,
+        );
+      }
     }
 
     const [updated] = await db

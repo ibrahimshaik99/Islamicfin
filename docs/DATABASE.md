@@ -154,10 +154,17 @@ whatsapp
 upi_id
 upi_qr_url
 address
+city_id          -- city marketplace this merchant publishes to (nullable, FK cities)
 verification_status
 created_at
 updated_at
 ```
+
+`city_id` drives marketplace visibility: a product is discoverable only in the
+city marketplace of its merchant. It defaults to the merchant's community city
+at onboarding and is backfilled by migration `0009`. When `city_id` is `NULL`
+the merchant's products are not listed in any city marketplace (management
+roles still see them).
 
 Verification:
 

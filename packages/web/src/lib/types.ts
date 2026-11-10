@@ -59,6 +59,7 @@ export interface Community {
   description?: string;
   logoUrl?: string;
   address?: string;
+  cityId?: string | null;
   city?: string;
   state?: string;
   country?: string;
@@ -147,11 +148,22 @@ export interface Merchant {
   upiId?: string;
   upiQrUrl?: string;
   address?: string;
+  /** City marketplace this merchant publishes to (products list only there). */
+  cityId?: string | null;
   verificationStatus: 'PENDING' | 'APPROVED' | 'REJECTED' | 'SUSPENDED';
   createdAt: string;
 }
 
 // ---- Marketplace ----
+
+export interface City {
+  id: string;
+  name: string;
+  state: string;
+  slug: string;
+  status: 'ACTIVE' | 'DISABLED';
+  activeCommunityCount?: number;
+}
 
 export interface ProductCategory {
   id: string;

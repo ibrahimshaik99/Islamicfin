@@ -797,4 +797,165 @@ describe('Marketplace Integration Tests', () => {
       expect(res.status).toBe(401);
     });
   });
+
+  describe('City marketplace visibility', () => {
+    const CITY_LOCAL = '00000000-0000-0000-0000-000000000c01';
+    const CITY_OTHER = '00000000-0000-0000-0000-000000000c02';
+
+    /** Deep search used to assert which city id ended up in a SQL predicate. */
+    function containsValue(obj: unknown, value: string, depth = 0): boolean {
+      if (depth > 14 || obj == null) return false;
+      if (obj === value) return true;
+      if (typeof obj !== 'object') return false;
+      if (Array.isArray(obj)) return obj.some((v) => containsValue(v, value, depth + 1));
+      return Object.values(obj as Record<string, unknown>).some((v) =>
+        containsValue(v, value, depth + 1),
+      );
+    }
+
+    /**
+     * Mocks db.select() so every predicate passed to .where(...) is recorded,
+     * and rows can be served per query call (1 = main query, 2 = images/count).
+     */
+    function recordWheres(rows: unknown[] | ((call: number) => unknown[]) = []) {
+      const conditions: unknown[] = [];
+      let call = 0;
+      mockDb.select.mockImplementation(() => {
+        call++;
+        const current = call;
+        const chain: Record<string, unknown> = {};
+        const self = () => chain;
+        chain.from = vi.fn(self);
+        chain.where = vi.fn((cond: unknown) => {
+          conditions.push(cond);
+          return chain;
+        });
+        chain.orderBy = vi.fn(self);
+        chain.limit = vi.fn(self);
+        chain.offset = vi.fn(self);
+        chain.then = (resolve: (v: unknown) => void) =>
+          resolve(typeof rows === 'function' ? rows(current) : rows);
+        return chain;
+      });
+      return conditions;
+    }
+
+    const cityPredicate = (conditions: unknown[], cityId: string) =>
+      conditions.some((cond) => containsValue(cond, cityId));
+
+    beforeEach(() => {
+      mockGetSessionUser.mockImplementation(async (token: string) => {
+        if (token === 'customer-session') {
+          return { id: USER_A, name: 'Customer A', email: 'customer-a@test.com', status: 'ACTIVE' };
+        }
+        if (token === 'admin-session') {
+          return { id: USER_B, name: 'Admin B', email: 'admin-b@test.com', status: 'ACTIVE' };
+        }
+        return null;
+      });
+      // Customer of Community A, whose community city is CITY_LOCAL.
+      mockResolveTenantContext.mockImplementation(async (userId: string, communityId: string) => {
+        if (communityId === COMMUNITY_A) {
+          return {
+            userId,
+            communityId: COMMUNITY_A,
+            role: 'CUSTOMER',
+            membershipId: 'mem-9',
+            communityCityId: CITY_LOCAL,
+          };
+        }
+        return null;
+      });
+    });
+
+    it('scopes the customer product list to their own (default local) city marketplace', async () => {
+      const conditions = recordWheres();
+
+      const res = await app.request(
+        `http://localhost/api/v1/communities/${COMMUNITY_A}/products`,
+        { headers: { cookie: createCookie('customer-session') } },
+        { ENVIRONMENT: 'test' },
+      );
+
+      expect(res.status).toBe(200);
+      expect(conditions.length).toBeGreaterThan(0);
+      expect(cityPredicate(conditions, CITY_LOCAL)).toBe(true);
+    });
+
+    it('lists another city marketplace only when the customer selects that city', async () => {
+      const conditions = recordWheres();
+
+      const res = await app.request(
+        `http://localhost/api/v1/communities/${COMMUNITY_A}/products?cityId=${CITY_OTHER}`,
+        { headers: { cookie: createCookie('customer-session') } },
+        { ENVIRONMENT: 'test' },
+      );
+
+      expect(res.status).toBe(200);
+      expect(cityPredicate(conditions, CITY_OTHER)).toBe(true);
+      expect(cityPredicate(conditions, CITY_LOCAL)).toBe(false);
+    });
+
+    it('rejects a malformed cityId with 400 instead of silently widening the query', async () => {
+      const res = await app.request(
+        `http://localhost/api/v1/communities/${COMMUNITY_A}/products?cityId=not-a-uuid`,
+        { headers: { cookie: createCookie('customer-session') } },
+        { ENVIRONMENT: 'test' },
+      );
+
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as { error: { code: string } };
+      expect(body.error.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('does not implicitly city-scope catalog management roles', async () => {
+      mockResolveTenantContext.mockResolvedValue({
+        userId: USER_B,
+        communityId: COMMUNITY_A,
+        role: 'COMMUNITY_ADMIN',
+        membershipId: 'mem-1',
+        communityCityId: CITY_LOCAL,
+      });
+      const conditions = recordWheres();
+
+      const res = await app.request(
+        `http://localhost/api/v1/communities/${COMMUNITY_A}/products`,
+        { headers: { cookie: createCookie('admin-session') } },
+        { ENVIRONMENT: 'test' },
+      );
+
+      expect(res.status).toBe(200);
+      expect(conditions.length).toBeGreaterThan(0);
+      expect(cityPredicate(conditions, CITY_LOCAL)).toBe(false);
+    });
+
+    it('applies the same city gate to product detail (direct links)', async () => {
+      const conditions = recordWheres();
+
+      const res = await app.request(
+        `http://localhost/api/v1/communities/${COMMUNITY_A}/products/${PRODUCT_ID}`,
+        { headers: { cookie: createCookie('customer-session') } },
+        { ENVIRONMENT: 'test' },
+      );
+
+      // Product exists in the tenant but not in the requester's city marketplace.
+      expect(res.status).toBe(404);
+      expect(cityPredicate(conditions, CITY_LOCAL)).toBe(true);
+    });
+
+    it('serves product detail when the matching city marketplace is selected', async () => {
+      const conditions = recordWheres((call) =>
+        call === 1 ? [{ id: PRODUCT_ID, name: 'Other city product', price: '100.00' }] : [],
+      );
+
+      const res = await app.request(
+        `http://localhost/api/v1/communities/${COMMUNITY_A}/products/${PRODUCT_ID}?cityId=${CITY_OTHER}`,
+        { headers: { cookie: createCookie('customer-session') } },
+        { ENVIRONMENT: 'test' },
+      );
+
+      expect(res.status).toBe(200);
+      expect(cityPredicate(conditions, CITY_OTHER)).toBe(true);
+    });
+  });
 });
